@@ -1,0 +1,3476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Apple HIG Mastery Check</title>
+
+  <!--
+    ============================================================
+    SETUP INSTRUCTIONS
+    ============================================================
+    
+    1. Go to https://console.firebase.google.com/
+    2. Create a new project (e.g., "hig-quiz-jatapp")
+    3. Enable Authentication → Google sign-in provider
+    4. In Auth settings → Authorized domains, add your GitHub Pages domain
+    5. Enable Firestore Database (start in test mode, then add rules below)
+    6. Copy your Firebase config and paste it in the firebaseConfig object below
+    
+    Firestore Security Rules:
+    rules_version = '2';
+    service cloud.firestore {
+      match /databases/{database}/documents {
+        match /results/{email} {
+          allow read: if request.auth != null && 
+            (request.auth.token.email == email || 
+             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com');
+          allow write: if request.auth != null && request.auth.token.email == email;
+        }
+        match /results/{email} {
+          allow delete: if request.auth != null && 
+            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+        }
+        match /results_archive/{doc} {
+          allow read, write: if request.auth != null && 
+            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+        }
+      }
+    }
+    
+    7. For email notifications, set up EmailJS:
+       - Go to https://www.emailjs.com/
+       - Create account, add Gmail service
+       - Create email template matching the format in the code
+       - Copy Service ID, Template ID, and Public Key into the config below
+    ============================================================
+  -->
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Firebase SDK (compat for single-file simplicity) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <!-- 1: STYLES -->
+  <style>
+    /* === CSS RESET & VARIABLES === */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-primary: #0D1422;
+      --bg-secondary: #111827;
+      --bg-card: rgba(30, 45, 69, 0.6);
+      --border-card: #1E2D45;
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+      --accent-teal: #00D4B4;
+      --accent-amber: #F59E0B;
+      --accent-red: #EF4444;
+      --accent-blue: #3B82F6;
+      --accent-orange: #F97316;
+      --accent-purple: #8B5CF6;
+      --font-heading: 'Syne', sans-serif;
+      --font-mono: 'DM Mono', monospace;
+      --font-body: 'Inter', sans-serif;
+    }
+
+    html {
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* === DECORATIVE BACKGROUND BLOBS === */
+    body::before,
+    body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::before {
+      width: 600px;
+      height: 600px;
+      top: -100px;
+      right: -100px;
+      background: radial-gradient(circle, rgba(0, 212, 180, 0.08) 0%, transparent 70%);
+      filter: blur(80px);
+    }
+
+    body::after {
+      width: 500px;
+      height: 500px;
+      bottom: -100px;
+      left: -100px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 70%);
+      filter: blur(80px);
+    }
+
+    /* === UTILITY CLASSES === */
+    .hidden { display: none !important; }
+
+    .screen {
+      display: none;
+      position: relative;
+      z-index: 1;
+    }
+
+    .screen.active {
+      display: block;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
+    /* === HEADER === */
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(13, 20, 34, 0.85);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-card);
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .app-header .logo {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .app-header .logo .apple-icon {
+      font-size: 22px;
+      color: var(--accent-teal);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-user img {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid var(--border-card);
+    }
+
+    .header-user span {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-family: var(--font-body);
+    }
+
+    .btn {
+      font-family: var(--font-body);
+      font-weight: 500;
+      font-size: 14px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--accent-teal);
+      color: #0D1422;
+      padding: 12px 24px;
+      font-weight: 600;
+    }
+
+    .btn-primary:hover {
+      background: #00E8C6;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(0, 212, 180, 0.3);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-secondary);
+      padding: 8px 16px;
+      border: 1px solid var(--border-card);
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(0, 212, 180, 0.3);
+      color: var(--text-primary);
+    }
+
+    .btn-admin {
+      background: rgba(139, 92, 246, 0.15);
+      color: var(--accent-purple);
+      padding: 8px 16px;
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      font-size: 13px;
+    }
+
+    .btn-admin:hover {
+      background: rgba(139, 92, 246, 0.25);
+    }
+
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      padding: 8px 16px;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      font-size: 13px;
+    }
+
+    .btn-danger:hover {
+      background: rgba(239, 68, 68, 0.25);
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    /* === CARD COMPONENTS === */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      backdrop-filter: blur(12px);
+      padding: 24px;
+      transition: all 0.2s ease;
+    }
+
+    .card:hover {
+      border-color: rgba(0, 212, 180, 0.15);
+    }
+
+    /* === CONTAINER === */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    .container-wide {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* === BADGE === */
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .badge-teal { background: rgba(0, 212, 180, 0.15); color: var(--accent-teal); }
+    .badge-amber { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); }
+    .badge-red { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+    .badge-blue { background: rgba(59, 130, 246, 0.15); color: var(--accent-blue); }
+    .badge-orange { background: rgba(249, 115, 22, 0.15); color: var(--accent-orange); }
+    .badge-purple { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); }
+
+    /* =====================================================
+       2: AUTH SCREEN
+       ===================================================== */
+    .auth-screen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 65px);
+    }
+
+    .auth-card {
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+    }
+
+    .auth-icon {
+      font-size: 56px;
+      margin-bottom: 24px;
+      display: block;
+    }
+
+    .auth-title {
+      font-family: var(--font-heading);
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+
+    .auth-subtitle {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 36px;
+      line-height: 1.6;
+    }
+
+    .btn-google {
+      background: #fff;
+      color: #1f1f1f;
+      padding: 14px 28px;
+      font-size: 15px;
+      font-weight: 600;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s ease;
+      font-family: var(--font-body);
+    }
+
+    .btn-google:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-google svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .auth-footer {
+      margin-top: 40px;
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .auth-error {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      color: var(--accent-red);
+      font-size: 14px;
+    }
+
+    /* =====================================================
+       3: PRE-QUIZ SCREEN
+       ===================================================== */
+    .prequiz-screen .container {
+      max-width: 640px;
+    }
+
+    .greeting {
+      font-family: var(--font-heading);
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .greeting-sub {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .quiz-info-card {
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    .quiz-info-card h3 {
+      font-family: var(--font-heading);
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .info-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .info-item .info-icon {
+      font-size: 20px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .info-item .info-text {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .info-item .info-text strong {
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .info-item .info-text span {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    .prequiz-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 28px;
+    }
+
+    .prequiz-actions .time-est {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* =====================================================
+       4: QUIZ SCREEN
+       ===================================================== */
+    .quiz-screen {
+      min-height: calc(100vh - 65px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Quiz top bar */
+    .quiz-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border-card);
+      background: rgba(13, 20, 34, 0.5);
+      backdrop-filter: blur(12px);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .quiz-progress {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .quiz-progress-text {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+    }
+
+    .progress-bar {
+      flex: 1;
+      height: 6px;
+      background: rgba(30, 45, 69, 0.8);
+      border-radius: 3px;
+      overflow: hidden;
+      max-width: 200px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-teal), var(--accent-blue));
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .quiz-timer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timer-value {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--accent-teal);
+      min-width: 36px;
+      text-align: center;
+      transition: color 0.3s ease;
+    }
+
+    .timer-value.warning { color: var(--accent-amber); }
+    .timer-value.critical { color: var(--accent-red); animation: pulse 0.5s ease infinite; }
+
+    .timer-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+    }
+
+    .quiz-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .tab-switch-counter {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 4px 8px;
+      background: rgba(239, 68, 68, 0.08);
+      border-radius: 4px;
+    }
+
+    .tab-switch-counter.active {
+      color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    /* Question area */
+    .quiz-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .question-container {
+      max-width: 720px;
+      width: 100%;
+      animation: slideIn 0.3s ease;
+    }
+
+    .question-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .question-text {
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .question-hint {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-style: italic;
+    }
+
+    /* Answer options */
+    .options-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .option-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      user-select: none;
+    }
+
+    .option-card:hover:not(.disabled) {
+      border-color: rgba(0, 212, 180, 0.3);
+      background: rgba(30, 45, 69, 0.8);
+    }
+
+    .option-card.selected {
+      border-color: var(--accent-teal);
+      box-shadow: 0 0 0 1px var(--accent-teal), 0 0 20px rgba(0, 212, 180, 0.1);
+    }
+
+    .option-card.correct {
+      border-color: var(--accent-teal);
+      background: rgba(0, 212, 180, 0.08);
+    }
+
+    .option-card.wrong {
+      border-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.08);
+    }
+
+    .option-card.disabled {
+      cursor: default;
+      opacity: 0.7;
+    }
+
+    .option-card.disabled.correct { opacity: 1; }
+    .option-card.disabled.wrong { opacity: 1; }
+
+    .option-indicator {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 2px solid var(--border-card);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+    }
+
+    .option-card.selected .option-indicator {
+      border-color: var(--accent-teal);
+      background: var(--accent-teal);
+      color: #0D1422;
+    }
+
+    .option-card.correct .option-indicator {
+      border-color: var(--accent-teal);
+      background: var(--accent-teal);
+      color: #0D1422;
+    }
+
+    .option-card.wrong .option-indicator {
+      border-color: var(--accent-red);
+      background: var(--accent-red);
+      color: #fff;
+    }
+
+    /* For multiple choice: checkbox style */
+    .option-card[data-type="multiple"] .option-indicator {
+      border-radius: 6px;
+    }
+
+    .option-text {
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--text-primary);
+    }
+
+    /* Post-answer explanation */
+    .explanation-box {
+      margin-top: 20px;
+      padding: 20px;
+      background: rgba(30, 45, 69, 0.4);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .explanation-box .explanation-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .explanation-box .explanation-text {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .explanation-box .hig-link {
+      font-size: 13px;
+      color: var(--accent-teal);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+    }
+
+    .explanation-box .hig-link:hover {
+      opacity: 0.8;
+    }
+
+    .quiz-nav {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    /* =====================================================
+       5: RESULTS SCREEN
+       ===================================================== */
+    .results-screen .container {
+      max-width: 800px;
+    }
+
+    .results-header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    .results-score {
+      font-family: var(--font-heading);
+      font-size: 72px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .results-pct {
+      font-family: var(--font-mono);
+      font-size: 28px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .results-level-badge {
+      font-family: var(--font-heading);
+      font-size: 22px;
+      font-weight: 600;
+      padding: 8px 24px;
+      border-radius: 12px;
+      display: inline-block;
+    }
+
+    .results-section {
+      margin-bottom: 32px;
+    }
+
+    .results-section h3 {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Radar chart container */
+    .radar-chart-wrap {
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* Category breakdown grid */
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .category-card {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .category-card .cat-name {
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .category-card .cat-score {
+      font-family: var(--font-mono);
+      font-size: 14px;
+    }
+
+    .category-card .cat-status {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .category-card .cat-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Time stats */
+    .time-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .time-stat-card {
+      text-align: center;
+      padding: 20px;
+    }
+
+    .time-stat-card .stat-value {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 500;
+      color: var(--accent-teal);
+      margin-bottom: 4px;
+    }
+
+    .time-stat-card .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Recommendations */
+    .rec-card {
+      margin-bottom: 12px;
+      padding: 20px;
+    }
+
+    .rec-card .rec-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .rec-card .rec-title {
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .rec-card .rec-tips {
+      list-style: none;
+      padding: 0;
+    }
+
+    .rec-card .rec-tips li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      padding: 4px 0;
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .rec-card .rec-tips li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+    }
+
+    .rec-card .rec-link {
+      font-size: 13px;
+      color: var(--accent-teal);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .tab-switch-warning {
+      margin-top: 20px;
+      padding: 12px 16px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 10px;
+      color: var(--accent-amber);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    .results-actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    /* =====================================================
+       6: RETURNING USER SCREEN
+       ===================================================== */
+    .returning-screen .container {
+      max-width: 600px;
+      text-align: center;
+    }
+
+    .returning-screen .returning-msg {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin: 16px 0 24px;
+      line-height: 1.6;
+    }
+
+    /* =====================================================
+       7: ADMIN PANEL
+       ===================================================== */
+    .admin-screen .container-wide {
+      padding-top: 24px;
+    }
+
+    .admin-title {
+      font-family: var(--font-heading);
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Aggregate stats cards */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      padding: 20px;
+      text-align: center;
+    }
+
+    .stat-card .stat-number {
+      font-family: var(--font-heading);
+      font-size: 36px;
+      font-weight: 700;
+      color: var(--accent-teal);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .stat-card .stat-title {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Admin charts row */
+    .admin-charts-row {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .admin-chart-card {
+      padding: 24px;
+    }
+
+    .admin-chart-card h4 {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .admin-chart-wrap {
+      max-height: 300px;
+      position: relative;
+    }
+
+    /* Leaderboard */
+    .leaderboard-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .leaderboard-header h3 {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .leaderboard-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .leaderboard-controls input,
+    .leaderboard-controls select {
+      font-family: var(--font-body);
+      font-size: 13px;
+      padding: 8px 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 8px;
+      color: var(--text-primary);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .leaderboard-controls input:focus,
+    .leaderboard-controls select:focus {
+      border-color: rgba(0, 212, 180, 0.4);
+    }
+
+    .leaderboard-controls select option {
+      background: var(--bg-primary);
+    }
+
+    .leaderboard-table-wrap {
+      overflow-x: auto;
+      margin-bottom: 32px;
+    }
+
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .leaderboard-table th {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-card);
+      cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    .leaderboard-table th:hover {
+      color: var(--text-secondary);
+    }
+
+    .leaderboard-table th .sort-arrow {
+      margin-left: 4px;
+      font-size: 10px;
+    }
+
+    .leaderboard-table td {
+      padding: 14px;
+      border-bottom: 1px solid rgba(30, 45, 69, 0.4);
+      vertical-align: middle;
+    }
+
+    .leaderboard-table tr:hover td {
+      background: rgba(30, 45, 69, 0.3);
+    }
+
+    .leaderboard-table .user-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .leaderboard-table .user-cell img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+
+    .leaderboard-table .user-cell .user-name {
+      font-weight: 500;
+    }
+
+    .leaderboard-table .user-cell .user-email {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .leaderboard-table .score-cell {
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .leaderboard-table .actions-cell {
+      display: flex;
+      gap: 8px;
+    }
+
+    /* Admin modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 200;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      max-width: 700px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 32px;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .modal-header h3 {
+      font-family: var(--font-heading);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 8px;
+      transition: all 0.2s;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    /* Modal detail sections */
+    .modal-section {
+      margin-bottom: 24px;
+    }
+
+    .modal-section h4 {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .modal-answers-list {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .modal-answer-item {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(30, 45, 69, 0.4);
+      font-size: 13px;
+    }
+
+    .modal-answer-item .q-text {
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .modal-answer-item .q-result {
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    /* Loading spinner */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      transition: opacity 0.3s;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border-card);
+      border-top-color: var(--accent-teal);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* =====================================================
+       8: RESPONSIVE
+       ===================================================== */
+    @media (max-width: 768px) {
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .category-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .time-stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .admin-charts-row {
+        grid-template-columns: 1fr;
+      }
+
+      .quiz-topbar {
+        padding: 12px 16px;
+      }
+
+      .question-text {
+        font-size: 17px;
+      }
+
+      .results-score {
+        font-size: 56px;
+      }
+
+      .auth-title {
+        font-size: 28px;
+      }
+
+      .leaderboard-controls {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+
+      .container, .container-wide {
+        padding: 24px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading overlay -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <!-- App Header -->
+  <header class="app-header">
+    <div class="logo">
+      <span class="apple-icon"></span>
+      <span>HIG Mastery Check</span>
+    </div>
+    <div class="header-actions">
+      <button id="btnAdmin" class="btn btn-admin hidden" onclick="showScreen('admin')">
+        ⚙️ Admin Panel
+      </button>
+      <div id="headerUser" class="header-user hidden">
+        <img id="headerPhoto" src="" alt="">
+        <span id="headerName"></span>
+      </div>
+      <button id="btnSignOut" class="btn btn-secondary hidden" onclick="signOut()">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <!-- =====================================================
+       SCREEN: AUTH
+       ===================================================== -->
+  <div id="screenAuth" class="screen auth-screen active">
+    <div class="auth-card">
+      <span class="auth-icon"></span>
+      <h1 class="auth-title">Apple HIG<br>Mastery Check</h1>
+      <p class="auth-subtitle">
+        Test your knowledge of Apple Human Interface Guidelines across typography, navigation, components, accessibility, and more.
+      </p>
+      <button class="btn-google" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <div id="authError" class="auth-error hidden"></div>
+      <p class="auth-footer">Restricted to @jatapp.com · JATAPP Design Team</p>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       SCREEN: PRE-QUIZ
+       ===================================================== -->
+  <div id="screenPreQuiz" class="screen prequiz-screen">
+    <div class="container">
+      <h2 class="greeting">Hey, <span id="userFirstName"></span>! 👋</h2>
+      <p class="greeting-sub">Ready to test your Apple HIG knowledge?</p>
+
+      <div class="card quiz-info-card">
+        <h3>What to expect</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-icon">📝</span>
+            <div class="info-text">
+              <strong>25 questions</strong>
+              <span>Random selection from 40-question bank</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">⏱️</span>
+            <div class="info-text">
+              <strong>60 seconds each</strong>
+              <span>Timer per question, auto-advance on timeout</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">📊</span>
+            <div class="info-text">
+              <strong>8 categories</strong>
+              <span>Typography, Layout, Icons, Nav, Controls, Feedback, Input, A11y</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">🎯</span>
+            <div class="info-text">
+              <strong>One attempt</strong>
+              <span>Results are final — study up!</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card quiz-info-card">
+        <h3>Question types</h3>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-icon">🔘</span>
+            <div class="info-text">
+              <strong>Single choice</strong>
+              <span>Pick one correct answer</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">☑️</span>
+            <div class="info-text">
+              <strong>Multiple choice</strong>
+              <span>Select ALL correct answers</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">✅</span>
+            <div class="info-text">
+              <strong>True / False</strong>
+              <span>Evaluate the statement</span>
+            </div>
+          </div>
+          <div class="info-item">
+            <span class="info-icon">📈</span>
+            <div class="info-text">
+              <strong>3 difficulty levels</strong>
+              <span>Basic, Intermediate, Advanced</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="prequiz-actions">
+        <span class="time-est">~20-25 min estimated</span>
+        <button class="btn btn-primary" onclick="startQuiz()">
+          Start Quiz →
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       SCREEN: QUIZ
+       ===================================================== -->
+  <div id="screenQuiz" class="screen quiz-screen">
+    <div class="quiz-topbar">
+      <div class="quiz-progress">
+        <span class="quiz-progress-text" id="progressText">Question 1 of 25</span>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill" style="width: 4%"></div>
+        </div>
+      </div>
+      <div class="quiz-timer">
+        <span class="timer-value" id="timerValue">60</span>
+        <span class="timer-label">sec</span>
+      </div>
+      <div class="quiz-meta">
+        <span class="badge badge-teal" id="categoryBadge">Category</span>
+        <span class="tab-switch-counter" id="tabSwitchCounter">Tab switches: 0</span>
+      </div>
+    </div>
+
+    <div class="quiz-content">
+      <div class="question-container" id="questionContainer">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       SCREEN: RESULTS
+       ===================================================== -->
+  <div id="screenResults" class="screen results-screen">
+    <div class="container">
+      <div class="results-header">
+        <div class="results-score" id="resScore">18/25</div>
+        <div class="results-pct" id="resPct">72%</div>
+        <div class="results-level-badge" id="resLevel">HIG Practitioner</div>
+      </div>
+
+      <div class="results-section">
+        <h3>📊 Performance by Category</h3>
+        <div class="radar-chart-wrap">
+          <canvas id="radarChart"></canvas>
+        </div>
+      </div>
+
+      <div class="results-section">
+        <h3>📋 Category Breakdown</h3>
+        <div class="category-grid" id="categoryGrid"></div>
+      </div>
+
+      <div class="results-section">
+        <h3>⏱️ Time Statistics</h3>
+        <div class="time-stats-grid" id="timeStats"></div>
+      </div>
+
+      <div class="results-section">
+        <h3>📚 Recommendations</h3>
+        <div id="recommendations"></div>
+      </div>
+
+      <div id="tabSwitchWarning" class="tab-switch-warning hidden"></div>
+
+      <div class="results-actions">
+        <button class="btn btn-primary" onclick="shareResults()">📋 Copy Results</button>
+        <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       SCREEN: RETURNING USER
+       ===================================================== -->
+  <div id="screenReturning" class="screen returning-screen">
+    <div class="container">
+      <div class="results-header">
+        <div class="results-score" id="retScore">18/25</div>
+        <div class="results-pct" id="retPct">72%</div>
+        <div class="results-level-badge" id="retLevel">HIG Practitioner</div>
+      </div>
+      <p class="returning-msg">
+        You've already completed this quiz. Your results are shown above.<br>
+        Contact the admin for a retry.
+      </p>
+
+      <div class="results-section">
+        <h3>📊 Performance by Category</h3>
+        <div class="radar-chart-wrap">
+          <canvas id="retRadarChart"></canvas>
+        </div>
+      </div>
+
+      <div class="results-section">
+        <h3>📋 Category Breakdown</h3>
+        <div class="category-grid" id="retCategoryGrid"></div>
+      </div>
+
+      <div class="results-actions">
+        <button class="btn btn-primary" onclick="shareResults()">📋 Copy Results</button>
+        <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       SCREEN: ADMIN
+       ===================================================== -->
+  <div id="screenAdmin" class="screen admin-screen">
+    <div class="container-wide">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:24px;">
+        <h2 class="admin-title" style="margin-bottom:0;">⚙️ Admin Panel</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="showScreen('prequiz')">← Back to Quiz</button>
+        </div>
+      </div>
+
+      <!-- Aggregate stats -->
+      <div class="stats-row" id="adminStats">
+        <div class="card stat-card">
+          <div class="stat-number" id="statTotal">0</div>
+          <div class="stat-title">Participants</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-number" id="statAvg">0%</div>
+          <div class="stat-title">Avg Score</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-number" id="statTop">—</div>
+          <div class="stat-title">Top Score</div>
+        </div>
+        <div class="card stat-card">
+          <div class="stat-number" id="statWeakest">—</div>
+          <div class="stat-title">Weakest Area</div>
+        </div>
+      </div>
+
+      <!-- Admin charts -->
+      <div class="admin-charts-row">
+        <div class="card admin-chart-card">
+          <h4>Score Distribution</h4>
+          <div class="admin-chart-wrap">
+            <canvas id="adminDistChart"></canvas>
+          </div>
+        </div>
+        <div class="card admin-chart-card">
+          <h4>Avg Category Performance</h4>
+          <div class="admin-chart-wrap">
+            <canvas id="adminRadarChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Leaderboard -->
+      <div class="leaderboard-header">
+        <h3>🏆 Leaderboard</h3>
+        <div class="leaderboard-controls">
+          <input type="text" id="searchInput" placeholder="Search name or email..." oninput="filterLeaderboard()">
+          <select id="filterLevel" onchange="filterLeaderboard()">
+            <option value="">All Levels</option>
+            <option value="HIG Master">HIG Master</option>
+            <option value="HIG Proficient">HIG Proficient</option>
+            <option value="HIG Practitioner">HIG Practitioner</option>
+            <option value="HIG Explorer">HIG Explorer</option>
+            <option value="HIG Novice">HIG Novice</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="leaderboard-table-wrap">
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th onclick="sortLeaderboard('rank')"># <span class="sort-arrow">↕</span></th>
+              <th onclick="sortLeaderboard('name')">Name <span class="sort-arrow">↕</span></th>
+              <th onclick="sortLeaderboard('score')">Score <span class="sort-arrow">↕</span></th>
+              <th onclick="sortLeaderboard('level')">Level <span class="sort-arrow">↕</span></th>
+              <th onclick="sortLeaderboard('date')">Date <span class="sort-arrow">↕</span></th>
+              <th>Time</th>
+              <th>Tabs</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboardBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Detail Modal -->
+  <div class="modal-overlay" id="userDetailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modalUserName">User Details</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modalBody">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================
+       9: JAVASCRIPT — CONFIG & STATE
+       ===================================================== -->
+  <script>
+    // ── Firebase Config ──
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    // ── EmailJS Config ──
+    const EMAILJS_SERVICE_ID = "YOUR_SERVICE_ID";
+    const EMAILJS_TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+    const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
+
+    // ── Constants ──
+    const ADMIN_EMAIL = "mykhailo.mirzaiev@jatapp.com";
+    const ALLOWED_DOMAIN = "jatapp.com";
+    const QUESTIONS_PER_SESSION = 25;
+    const TIME_PER_QUESTION = 60;
+    const MIN_PER_CATEGORY = 3;
+
+    // ── App State ──
+    let currentUser = null;
+    let quizState = {
+      questions: [],
+      currentIndex: 0,
+      answers: [],
+      selectedOptions: [],
+      timer: null,
+      timeLeft: TIME_PER_QUESTION,
+      startTime: null,
+      questionStartTime: null,
+      tabSwitches: 0,
+      answered: false
+    };
+    let allResults = []; // for admin
+    let adminSortField = 'score';
+    let adminSortDir = 'desc';
+
+    // ── Initialize Firebase ──
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ── Initialize EmailJS ──
+    if (typeof emailjs !== 'undefined') {
+      emailjs.init(EMAILJS_PUBLIC_KEY);
+    }
+
+    // =====================================================
+    // 10: QUESTION BANK — 40 questions, 5 per category
+    // =====================================================
+    // IMPORTANT: Each question has been verified against the actual Apple HIG.
+    // The higReference field links to the exact HIG page for verification.
+
+    const CATEGORY_NAMES = {
+      'typography-color': 'Typography & Color',
+      'layout-spacing': 'Layout & Spacing',
+      'icons-images': 'Icons & Images',
+      'navigation': 'Navigation & Structure',
+      'controls': 'Controls',
+      'feedback-status': 'Feedback & Status',
+      'user-input': 'User Input & Interaction',
+      'accessibility': 'Accessibility & Inclusivity'
+    };
+
+    const QUESTION_BANK = [
+      // ── Category 1: Typography & Color (5 questions) ──
+      {
+        id: "tc1",
+        category: "typography-color",
+        type: "single",
+        difficulty: "basic",
+        question: "What is the name of the system font family used across Apple platforms?",
+        options: ["Helvetica Neue", "San Francisco", "Avenir", "Gill Sans"],
+        correct: ["San Francisco"],
+        explanation: "San Francisco (SF) is Apple's system font family. It includes SF Pro for iOS, macOS, and tvOS, and SF Compact for watchOS. The font is designed for optimal legibility across all Apple devices.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/typography"
+      },
+      {
+        id: "tc2",
+        category: "typography-color",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What does Dynamic Type allow users to do in iOS?",
+        options: [
+          "Change the app's color scheme",
+          "Adjust text size according to their preferences",
+          "Switch between serif and sans-serif fonts",
+          "Animate text transitions"
+        ],
+        correct: ["Adjust text size according to their preferences"],
+        explanation: "Dynamic Type lets users choose their preferred text size. Apps that support Dynamic Type adjust to the size the user specifies in Settings, ensuring text is readable for everyone.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/typography#Dynamic-Type"
+      },
+      {
+        id: "tc3",
+        category: "typography-color",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which of the following are semantic (system-defined) colors in iOS that automatically adapt to light and dark mode? (Select all that apply)",
+        options: ["label", "secondaryLabel", "systemBackground", "flatWhite", "tertiarySystemFill"],
+        correct: ["label", "secondaryLabel", "systemBackground", "tertiarySystemFill"],
+        explanation: "iOS provides semantic colors like label, secondaryLabel, systemBackground, and tertiarySystemFill that automatically adapt between light and dark appearances. 'flatWhite' is not a system-defined color.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/color#System-colors"
+      },
+      {
+        id: "tc4",
+        category: "typography-color",
+        type: "truefalse",
+        difficulty: "intermediate",
+        question: "Apple recommends using hard-coded color values (like #FFFFFF for white) instead of semantic system colors so designers have full control over the appearance.",
+        options: ["True", "False"],
+        correct: ["False"],
+        explanation: "Apple recommends using semantic and system-defined colors rather than hard-coded values. System colors automatically adapt to light/dark mode, accessibility settings like Increase Contrast, and other environmental changes.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/color"
+      },
+      {
+        id: "tc5",
+        category: "typography-color",
+        type: "single",
+        difficulty: "basic",
+        question: "What is the purpose of the SF Pro Text variant of the San Francisco font?",
+        options: [
+          "For display sizes (20pt and above)",
+          "For body text sizes (19pt and below)",
+          "For monospaced code display",
+          "For watchOS interfaces only"
+        ],
+        correct: ["For body text sizes (19pt and below)"],
+        explanation: "SF Pro Text is optimized for smaller text sizes (19 points and below) with wider letter spacing and proportions. SF Pro Display is used for 20 points and above. The system automatically switches between them.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/typography"
+      },
+
+      // ── Category 2: Layout & Spacing (5 questions) ──
+      {
+        id: "ls1",
+        category: "layout-spacing",
+        type: "single",
+        difficulty: "basic",
+        question: "What are safe areas in iOS?",
+        options: [
+          "Areas where users are most likely to tap",
+          "Regions of the screen that are guaranteed to be unobscured by system UI elements",
+          "Memory-safe regions for storing user data",
+          "Zones where animations should not occur"
+        ],
+        correct: ["Regions of the screen that are guaranteed to be unobscured by system UI elements"],
+        explanation: "Safe areas define the portions of the screen not covered by navigation bars, tab bars, toolbars, the status bar, the home indicator, or other system UI elements. Content placed within safe areas remains visible and interactive.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/layout"
+      },
+      {
+        id: "ls2",
+        category: "layout-spacing",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What is the standard default margin (leading/trailing) for content in an iOS app?",
+        options: ["8 points", "12 points", "16 points", "24 points"],
+        correct: ["16 points"],
+        explanation: "Apple uses 16 points as the standard default margin for content from the leading and trailing edges of the screen. This provides comfortable spacing while maximizing content area.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/layout"
+      },
+      {
+        id: "ls3",
+        category: "layout-spacing",
+        type: "truefalse",
+        difficulty: "basic",
+        question: "Auto Layout in iOS allows interfaces to adapt dynamically to different screen sizes, orientations, and localization changes.",
+        options: ["True", "False"],
+        correct: ["True"],
+        explanation: "Auto Layout uses constraints to define relationships between UI elements, enabling interfaces to adapt automatically to different screen sizes, orientations, Dynamic Type sizes, and localized text lengths.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/layout"
+      },
+      {
+        id: "ls4",
+        category: "layout-spacing",
+        type: "single",
+        difficulty: "advanced",
+        question: "What is the 'readable content width' in Apple's layout guidelines?",
+        options: [
+          "The maximum width of the entire screen",
+          "A width constraint that ensures text doesn't become too wide to read comfortably on larger screens",
+          "The minimum width required for accessibility",
+          "The width of a standard paragraph in Mail app"
+        ],
+        correct: ["A width constraint that ensures text doesn't become too wide to read comfortably on larger screens"],
+        explanation: "The readable content width guide provides margins that limit how wide text can get on larger screens like iPad. This ensures text line lengths stay comfortable to read, typically preventing lines from becoming too long.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/layout"
+      },
+      {
+        id: "ls5",
+        category: "layout-spacing",
+        type: "multiple",
+        difficulty: "intermediate",
+        question: "Which of the following are best practices for layout in iOS apps? (Select all that apply)",
+        options: [
+          "Use consistent spacing throughout the interface",
+          "Align elements to a grid for visual harmony",
+          "Always use fixed pixel values rather than relative sizing",
+          "Support both portrait and landscape orientations where appropriate"
+        ],
+        correct: [
+          "Use consistent spacing throughout the interface",
+          "Align elements to a grid for visual harmony",
+          "Support both portrait and landscape orientations where appropriate"
+        ],
+        explanation: "Apple recommends consistent spacing, grid alignment, and supporting multiple orientations. Using fixed pixel values is discouraged — instead, use Auto Layout with relative constraints for adaptable interfaces.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/layout"
+      },
+
+      // ── Category 3: Icons & Images (5 questions) ──
+      {
+        id: "ii1",
+        category: "icons-images",
+        type: "single",
+        difficulty: "basic",
+        question: "What is the name of Apple's built-in icon library that integrates with the San Francisco font?",
+        options: ["Material Icons", "SF Symbols", "Apple Glyphs", "iOS Icons"],
+        correct: ["SF Symbols"],
+        explanation: "SF Symbols is Apple's library of over 6,000 configurable symbols designed to integrate seamlessly with the San Francisco system font. Symbols automatically align with text in all weights and sizes.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/sf-symbols"
+      },
+      {
+        id: "ii2",
+        category: "icons-images",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which of the following are valid rendering modes for SF Symbols? (Select all that apply)",
+        options: ["Monochrome", "Hierarchical", "Palette", "Multicolor", "Gradient"],
+        correct: ["Monochrome", "Hierarchical", "Palette", "Multicolor"],
+        explanation: "SF Symbols supports four rendering modes: Monochrome (single color), Hierarchical (one color with varying opacity), Palette (multiple distinct colors per layer), and Multicolor (intrinsic fixed colors). While gradient rendering was added in SF Symbols 7, 'Gradient' is a visual effect, not a rendering mode.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/sf-symbols"
+      },
+      {
+        id: "ii3",
+        category: "icons-images",
+        type: "truefalse",
+        difficulty: "basic",
+        question: "iOS app icons should include transparency or visual effects like drop shadows within the icon artwork.",
+        options: ["True", "False"],
+        correct: ["False"],
+        explanation: "Apple requires app icons to have no transparency — the entire icon area must be filled. The system automatically applies the rounded rectangle (superellipse) mask and any necessary visual effects. Icons should not include drop shadows or other effects.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/app-icons"
+      },
+      {
+        id: "ii4",
+        category: "icons-images",
+        type: "single",
+        difficulty: "intermediate",
+        question: "When using SF Symbols alongside text labels, what should the symbol's weight match?",
+        options: [
+          "Always use the bold weight for emphasis",
+          "The weight of the adjacent text",
+          "Always use the regular weight",
+          "The weight doesn't matter as symbols auto-adjust"
+        ],
+        correct: ["The weight of the adjacent text"],
+        explanation: "SF Symbols are designed to match the weight of nearby text. When a symbol appears next to text, its weight should correspond to the font weight of that text to ensure visual consistency and harmony.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/sf-symbols"
+      },
+      {
+        id: "ii5",
+        category: "icons-images",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What are the standard image resolution scales provided for iOS apps?",
+        options: [
+          "@1x and @2x only",
+          "@1x, @2x, and @3x",
+          "@1x, @1.5x, @2x, and @3x",
+          "@2x and @3x only"
+        ],
+        correct: ["@1x, @2x, and @3x"],
+        explanation: "iOS uses three resolution scales: @1x (baseline), @2x (Retina), and @3x (Super Retina). Apps should provide image assets at all required scales for the devices they support to ensure crisp display.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/images"
+      },
+
+      // ── Category 4: Navigation & Structure (5 questions) ──
+      {
+        id: "nav1",
+        category: "navigation",
+        type: "single",
+        difficulty: "basic",
+        question: "How many tabs does Apple recommend as the maximum for a tab bar on iPhone?",
+        options: ["3", "4", "5", "7"],
+        correct: ["5"],
+        explanation: "Apple recommends using between 3 and 5 tabs on iPhone. If more sections are needed, a 'More' tab can provide access to additional items, though this requires extra taps and should be avoided when possible.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/tab-bars"
+      },
+      {
+        id: "nav2",
+        category: "navigation",
+        type: "single",
+        difficulty: "intermediate",
+        question: "When should you use a modal presentation instead of a push navigation?",
+        options: [
+          "For every new screen transition",
+          "When the task is self-contained and requires user attention or a decision before continuing",
+          "Only for settings screens",
+          "When navigating between related content in a hierarchy"
+        ],
+        correct: ["When the task is self-contained and requires user attention or a decision before continuing"],
+        explanation: "Modals are best for self-contained tasks that require focus — like composing a message, editing settings, or confirming an action. Push navigation is for drilling down through related content in a hierarchical structure.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/modality"
+      },
+      {
+        id: "nav3",
+        category: "navigation",
+        type: "truefalse",
+        difficulty: "intermediate",
+        question: "A tab bar should always remain visible even when the user navigates deeper into a section's hierarchy.",
+        options: ["True", "False"],
+        correct: ["True"],
+        explanation: "Apple guidelines state that a tab bar should remain visible everywhere except in modal views. It helps people understand that there are other sections and provides quick access to them regardless of where the user is in the navigation hierarchy.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/tab-bars"
+      },
+      {
+        id: "nav4",
+        category: "navigation",
+        type: "single",
+        difficulty: "advanced",
+        question: "On iPad, what navigation pattern does Apple recommend as an alternative to the tab bar for apps with many sections?",
+        options: ["Hamburger menu", "Sidebar", "Bottom sheet", "Floating action button"],
+        correct: ["Sidebar"],
+        explanation: "Apple recommends using a sidebar on iPad and Mac to provide navigation between multiple sections. Sidebars can accommodate more items than a tab bar and work well with the larger screen sizes available on these platforms.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/sidebars"
+      },
+      {
+        id: "nav5",
+        category: "navigation",
+        type: "multiple",
+        difficulty: "basic",
+        question: "Which of the following are standard navigation elements in iOS? (Select all that apply)",
+        options: ["Navigation bar", "Tab bar", "Toolbar", "Hamburger menu"],
+        correct: ["Navigation bar", "Tab bar", "Toolbar"],
+        explanation: "Navigation bars, tab bars, and toolbars are standard iOS navigation and control elements. The 'hamburger menu' (three horizontal lines) is not a standard iOS pattern — Apple recommends tab bars and sidebars instead.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/navigation"
+      },
+
+      // ── Category 5: Controls (5 questions) ──
+      {
+        id: "ctrl1",
+        category: "controls",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which of the following are standard button styles available in iOS? (Select all that apply)",
+        options: ["Filled", "Tinted (Gray)", "Plain (Borderless)", "Outlined", "Gradient"],
+        correct: ["Filled", "Tinted (Gray)", "Plain (Borderless)"],
+        explanation: "iOS offers Filled, Tinted (Gray), and Plain (Borderless) as standard button styles. 'Outlined' and 'Gradient' are not standard system button styles in Apple's design system.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/buttons"
+      },
+      {
+        id: "ctrl2",
+        category: "controls",
+        type: "single",
+        difficulty: "basic",
+        question: "What UI component should be used to let a user toggle a single setting on or off?",
+        options: ["Checkbox", "Toggle (Switch)", "Radio button", "Segmented control"],
+        correct: ["Toggle (Switch)"],
+        explanation: "In iOS, the toggle (switch) is the standard control for binary on/off settings. Unlike some other platforms, iOS doesn't use checkboxes for this purpose. The change takes effect immediately without requiring confirmation.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/toggles"
+      },
+      {
+        id: "ctrl3",
+        category: "controls",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What does a segmented control allow users to do?",
+        options: [
+          "Navigate between app sections like a tab bar",
+          "Select one option from a set of mutually exclusive options at the same level",
+          "Adjust a value along a continuous range",
+          "Open a dropdown list of options"
+        ],
+        correct: ["Select one option from a set of mutually exclusive options at the same level"],
+        explanation: "A segmented control lets people select one option from a set of two to five mutually exclusive options. It's used to switch between different views or filter content, not for primary navigation between app sections.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/segmented-controls"
+      },
+      {
+        id: "ctrl4",
+        category: "controls",
+        type: "truefalse",
+        difficulty: "intermediate",
+        question: "In iOS, a slider should always display its minimum and maximum values or descriptive images at each end.",
+        options: ["True", "False"],
+        correct: ["False"],
+        explanation: "While Apple suggests considering using images at each end of a slider to help communicate its purpose, this is not a strict requirement. The HIG states you 'can' provide min/max images — it's recommended for clarity but not mandatory in all contexts.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/sliders"
+      },
+      {
+        id: "ctrl5",
+        category: "controls",
+        type: "single",
+        difficulty: "basic",
+        question: "Which control should be used when a user needs to select a value from a large set of options, like choosing a date?",
+        options: ["Segmented control", "Slider", "Picker", "Text field"],
+        correct: ["Picker"],
+        explanation: "Pickers are ideal for selecting from large, predefined sets of values such as dates, times, or lists. They present values in a scrollable interface that's optimized for touch interaction.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/pickers"
+      },
+
+      // ── Category 6: Feedback & Status (5 questions) ──
+      {
+        id: "fs1",
+        category: "feedback-status",
+        type: "single",
+        difficulty: "basic",
+        question: "When should you use an alert in iOS?",
+        options: [
+          "To display any important message",
+          "To communicate critical information that requires acknowledgment or a decision",
+          "As a primary navigation pattern",
+          "To show loading progress"
+        ],
+        correct: ["To communicate critical information that requires acknowledgment or a decision"],
+        explanation: "Alerts are reserved for important situations that require acknowledgment or a decision, such as confirming a destructive action or notifying about an error. They interrupt the user's flow and should be used sparingly.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/alerts"
+      },
+      {
+        id: "fs2",
+        category: "feedback-status",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What is the recommended maximum number of buttons in an iOS alert?",
+        options: ["1", "2", "3", "No limit"],
+        correct: ["2"],
+        explanation: "Apple recommends using two buttons in most alerts — typically a preferred action and a cancel/dismiss action. While three buttons are possible, two-button alerts are easier to understand. Alerts with many actions are better suited as action sheets.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/alerts"
+      },
+      {
+        id: "fs3",
+        category: "feedback-status",
+        type: "single",
+        difficulty: "intermediate",
+        question: "When should you use an action sheet instead of an alert?",
+        options: [
+          "When you need to display an error message",
+          "When presenting a list of choices or actions related to the current context",
+          "When confirming a successful operation",
+          "When the user hasn't interacted with the app"
+        ],
+        correct: ["When presenting a list of choices or actions related to the current context"],
+        explanation: "Action sheets are best for presenting a set of two or more choices related to the current task or context. Unlike alerts, action sheets are contextual and don't communicate critical information — they offer options.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/action-sheets"
+      },
+      {
+        id: "fs4",
+        category: "feedback-status",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which types of haptic feedback does Apple define for iOS? (Select all that apply)",
+        options: ["Success", "Warning", "Error", "Heavy", "Vibrate"],
+        correct: ["Success", "Warning", "Error"],
+        explanation: "Apple defines notification haptics with three types: Success, Warning, and Error. These provide tactile feedback for specific outcomes. 'Heavy' is an impact feedback style (not notification type), and 'Vibrate' is not a defined haptic feedback type.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/playing-haptics"
+      },
+      {
+        id: "fs5",
+        category: "feedback-status",
+        type: "truefalse",
+        difficulty: "basic",
+        question: "You should use a progress indicator (progress bar) when the duration of a task is known, and an activity indicator (spinner) when it is indeterminate.",
+        options: ["True", "False"],
+        correct: ["True"],
+        explanation: "Apple distinguishes between progress indicators (determinate — showing how much of a task is complete) and activity indicators (indeterminate — showing that work is happening without indicating duration). Use the appropriate one based on whether you can estimate completion.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/progress-indicators"
+      },
+
+      // ── Category 7: User Input & Interaction (5 questions) ──
+      {
+        id: "ui1",
+        category: "user-input",
+        type: "single",
+        difficulty: "basic",
+        question: "What is the standard iOS gesture for going back to the previous screen?",
+        options: [
+          "Two-finger swipe left",
+          "Swipe from the left edge of the screen to the right",
+          "Tap and hold anywhere",
+          "Pinch inward"
+        ],
+        correct: ["Swipe from the left edge of the screen to the right"],
+        explanation: "The edge swipe (swiping from the left edge to the right) is the standard iOS gesture for navigating back in a navigation hierarchy. This is a system-level gesture and apps should not override it.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/gestures"
+      },
+      {
+        id: "ui2",
+        category: "user-input",
+        type: "single",
+        difficulty: "intermediate",
+        question: "When should an app request user permission (e.g., for location, camera)?",
+        options: [
+          "At app launch, before any interaction",
+          "Only when the feature that requires the permission is first needed",
+          "After the user has used the app for 5 minutes",
+          "Permission requests should be avoided entirely"
+        ],
+        correct: ["Only when the feature that requires the permission is first needed"],
+        explanation: "Apple strongly recommends requesting permissions only at the point of use — when the user initiates a feature that requires the permission. This provides context for why the permission is needed and increases the likelihood of approval.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/privacy"
+      },
+      {
+        id: "ui3",
+        category: "user-input",
+        type: "truefalse",
+        difficulty: "intermediate",
+        question: "Apps should always provide an onboarding tutorial that covers every feature before letting the user interact with the app.",
+        options: ["True", "False"],
+        correct: ["False"],
+        explanation: "Apple recommends keeping onboarding brief or optional. The best apps are intuitive enough that people can start using them immediately. If onboarding is needed, it should be concise, skippable, and focus only on key features.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/onboarding"
+      },
+      {
+        id: "ui4",
+        category: "user-input",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which of the following are standard system gestures in iOS? (Select all that apply)",
+        options: [
+          "Tap to select",
+          "Long press for context menu",
+          "Pinch to zoom",
+          "Three-finger swipe to undo",
+          "Circular rotation to adjust values"
+        ],
+        correct: ["Tap to select", "Long press for context menu", "Pinch to zoom", "Three-finger swipe to undo"],
+        explanation: "Tap, long press, pinch, and three-finger swipe for undo are all standard iOS gestures. Circular rotation is used on Apple Watch (Digital Crown) but is not a standard touch gesture on iOS.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/gestures"
+      },
+      {
+        id: "ui5",
+        category: "user-input",
+        type: "single",
+        difficulty: "basic",
+        question: "What should an app provide to allow users to reverse their most recent action?",
+        options: [
+          "A prominent 'Back' button on every screen",
+          "Undo and Redo support",
+          "A confirmation dialog before every action",
+          "An activity log in settings"
+        ],
+        correct: ["Undo and Redo support"],
+        explanation: "Apple recommends supporting undo and redo for reversible actions. iOS provides standard undo/redo through the shake gesture and three-finger gestures, allowing users to quickly reverse mistakes without disrupting their workflow.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/undo-and-redo"
+      },
+
+      // ── Category 8: Accessibility & Inclusivity (5 questions) ──
+      {
+        id: "a11y1",
+        category: "accessibility",
+        type: "single",
+        difficulty: "basic",
+        question: "What is the minimum recommended touch target size for interactive elements in iOS?",
+        options: ["32×32 pt", "44×44 pt", "48×48 dp", "36×36 pt"],
+        correct: ["44×44 pt"],
+        explanation: "Apple recommends a minimum tappable area of 44×44 points for all interactive elements. This ensures comfortable interaction even when the visual element appears smaller. The tappable area can extend beyond the visible bounds.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/accessibility#User-interaction"
+      },
+      {
+        id: "a11y2",
+        category: "accessibility",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What is VoiceOver in the context of iOS accessibility?",
+        options: [
+          "A text-to-speech feature for reading messages aloud",
+          "A built-in screen reader that describes interface elements for people who are blind or have low vision",
+          "A voice recording feature",
+          "A voice-controlled virtual assistant"
+        ],
+        correct: ["A built-in screen reader that describes interface elements for people who are blind or have low vision"],
+        explanation: "VoiceOver is Apple's built-in screen reader that reads aloud what's on screen, allowing people who are blind or have low vision to use their device. Apps must provide proper accessibility labels and hints for VoiceOver to work correctly.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/accessibility#VoiceOver"
+      },
+      {
+        id: "a11y3",
+        category: "accessibility",
+        type: "truefalse",
+        difficulty: "basic",
+        question: "Color alone is sufficient to convey important information in an iOS app, as long as the colors have sufficient contrast.",
+        options: ["True", "False"],
+        correct: ["False"],
+        explanation: "Apple states that you should never rely solely on color to differentiate objects, indicate interactivity, or communicate essential information. Always supplement color with text labels, shapes, or icons to ensure information is accessible to people with color vision deficiencies.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/color#Accessible-colors"
+      },
+      {
+        id: "a11y4",
+        category: "accessibility",
+        type: "single",
+        difficulty: "intermediate",
+        question: "What does the 'Reduce Motion' accessibility setting do, and how should apps respond to it?",
+        options: [
+          "It prevents all screen transitions entirely",
+          "It asks apps to minimize or replace motion-based effects with simpler alternatives like cross-dissolves",
+          "It locks the screen in portrait orientation",
+          "It disables scrolling animations"
+        ],
+        correct: ["It asks apps to minimize or replace motion-based effects with simpler alternatives like cross-dissolves"],
+        explanation: "When Reduce Motion is enabled, apps should replace large-scale animations and parallax effects with simpler alternatives like cross-dissolves. This helps people who experience motion sensitivity, vertigo, or discomfort from excessive animation.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/motion#Reducing-motion"
+      },
+      {
+        id: "a11y5",
+        category: "accessibility",
+        type: "multiple",
+        difficulty: "advanced",
+        question: "Which of the following accessibility features should iOS apps support? (Select all that apply)",
+        options: [
+          "VoiceOver labels for all interactive elements",
+          "Dynamic Type for text scaling",
+          "Sufficient color contrast ratios",
+          "Support for Switch Control",
+          "All of the above"
+        ],
+        correct: ["VoiceOver labels for all interactive elements", "Dynamic Type for text scaling", "Sufficient color contrast ratios", "Support for Switch Control"],
+        explanation: "All of these are important accessibility features. Apple expects apps to provide VoiceOver labels, support Dynamic Type, maintain sufficient contrast, and work with assistive technologies like Switch Control to ensure everyone can use the app.",
+        higReference: "https://developer.apple.com/design/human-interface-guidelines/accessibility"
+      }
+    ];
+
+
+    // =====================================================
+    // 11: AUTH LOGIC
+    // =====================================================
+
+    auth.onAuthStateChanged(async (user) => {
+      hideLoading();
+      if (user) {
+        const domain = user.email.split('@')[1];
+        if (domain !== ALLOWED_DOMAIN) {
+          showAuthError(`Access restricted to @${ALLOWED_DOMAIN} accounts only.`);
+          await auth.signOut();
+          return;
+        }
+        currentUser = user;
+        updateHeader(user);
+
+        // Check if user already completed quiz
+        try {
+          const doc = await db.collection('results').doc(user.email).get();
+          if (doc.exists) {
+            showReturningUser(doc.data());
+          } else {
+            showScreen('prequiz');
+          }
+        } catch (err) {
+          console.error('Firestore read error:', err);
+          showScreen('prequiz');
+        }
+      } else {
+        currentUser = null;
+        showScreen('auth');
+      }
+    });
+
+    function signInWithGoogle() {
+      showLoading();
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ hd: ALLOWED_DOMAIN });
+      auth.signInWithPopup(provider).catch((err) => {
+        hideLoading();
+        console.error('Auth error:', err);
+        showAuthError('Sign-in failed. Please try again.');
+      });
+    }
+
+    function signOut() {
+      auth.signOut().then(() => {
+        currentUser = null;
+        document.getElementById('headerUser').classList.add('hidden');
+        document.getElementById('btnSignOut').classList.add('hidden');
+        document.getElementById('btnAdmin').classList.add('hidden');
+        showScreen('auth');
+      });
+    }
+
+    function showAuthError(msg) {
+      const el = document.getElementById('authError');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    function updateHeader(user) {
+      document.getElementById('headerPhoto').src = user.photoURL || '';
+      document.getElementById('headerName').textContent = user.displayName?.split(' ')[0] || '';
+      document.getElementById('headerUser').classList.remove('hidden');
+      document.getElementById('btnSignOut').classList.remove('hidden');
+
+      if (user.email === ADMIN_EMAIL) {
+        document.getElementById('btnAdmin').classList.remove('hidden');
+      }
+    }
+
+    // =====================================================
+    // 12: SCREEN MANAGEMENT
+    // =====================================================
+
+    function showScreen(name) {
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      const screen = document.getElementById(`screen${capitalize(name)}`);
+      if (screen) {
+        screen.classList.add('active');
+      }
+
+      if (name === 'prequiz' && currentUser) {
+        document.getElementById('userFirstName').textContent =
+          currentUser.displayName?.split(' ')[0] || 'there';
+      }
+
+      if (name === 'admin') {
+        loadAdminData();
+      }
+    }
+
+    function capitalize(s) {
+      const map = {
+        'auth': 'Auth',
+        'prequiz': 'PreQuiz',
+        'quiz': 'Quiz',
+        'results': 'Results',
+        'returning': 'Returning',
+        'admin': 'Admin'
+      };
+      return map[s] || s;
+    }
+
+    function showReturningUser(data) {
+      document.getElementById('retScore').textContent = `${data.score}/${data.totalQuestions}`;
+      document.getElementById('retPct').textContent = `${data.percentage}%`;
+
+      const levelEl = document.getElementById('retLevel');
+      levelEl.textContent = data.level;
+      levelEl.style.background = getLevelBg(data.level);
+      levelEl.style.color = getLevelColor(data.level);
+
+      // Category grid
+      const catGrid = document.getElementById('retCategoryGrid');
+      catGrid.innerHTML = '';
+      Object.entries(data.categories).forEach(([key, cat]) => {
+        const status = cat.percentage >= 80 ? 'teal' : cat.percentage >= 50 ? 'amber' : 'red';
+        catGrid.innerHTML += `
+          <div class="card category-card">
+            <div class="cat-left">
+              <div class="cat-status" style="background:var(--accent-${status})"></div>
+              <span class="cat-name">${CATEGORY_NAMES[key] || key}</span>
+            </div>
+            <span class="cat-score">${cat.correct}/${cat.total}</span>
+          </div>`;
+      });
+
+      // Radar chart
+      renderRadarChart('retRadarChart', data.categories);
+
+      showScreen('returning');
+    }
+
+    function showLoading() {
+      document.getElementById('loadingOverlay').style.display = 'flex';
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingOverlay').style.display = 'none';
+    }
+
+
+    // =====================================================
+    // 13: QUIZ ENGINE
+    // =====================================================
+
+    function selectQuestions() {
+      // Ensure minimum 3 per category, then fill randomly to 25
+      const byCategory = {};
+      QUESTION_BANK.forEach(q => {
+        if (!byCategory[q.category]) byCategory[q.category] = [];
+        byCategory[q.category].push(q);
+      });
+
+      let selected = [];
+      const categories = Object.keys(byCategory);
+
+      // Pick MIN_PER_CATEGORY from each
+      categories.forEach(cat => {
+        const catQuestions = shuffle([...byCategory[cat]]);
+        selected.push(...catQuestions.slice(0, MIN_PER_CATEGORY));
+      });
+
+      // Fill remaining slots
+      const selectedIds = new Set(selected.map(q => q.id));
+      const remaining = QUESTION_BANK.filter(q => !selectedIds.has(q.id));
+      const shuffledRemaining = shuffle(remaining);
+      const needed = QUESTIONS_PER_SESSION - selected.length;
+      selected.push(...shuffledRemaining.slice(0, needed));
+
+      return shuffle(selected);
+    }
+
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+
+    function startQuiz() {
+      quizState.questions = selectQuestions();
+      quizState.currentIndex = 0;
+      quizState.answers = [];
+      quizState.selectedOptions = [];
+      quizState.tabSwitches = 0;
+      quizState.startTime = Date.now();
+      quizState.answered = false;
+
+      // Tab switch tracking
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      showScreen('quiz');
+      renderQuestion();
+    }
+
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        quizState.tabSwitches++;
+        const counter = document.getElementById('tabSwitchCounter');
+        counter.textContent = `Tab switches: ${quizState.tabSwitches}`;
+        if (quizState.tabSwitches > 0) counter.classList.add('active');
+      }
+    }
+
+    function renderQuestion() {
+      const q = quizState.questions[quizState.currentIndex];
+      quizState.selectedOptions = [];
+      quizState.answered = false;
+      quizState.questionStartTime = Date.now();
+
+      // Update top bar
+      document.getElementById('progressText').textContent =
+        `Question ${quizState.currentIndex + 1} of ${quizState.questions.length}`;
+      document.getElementById('progressFill').style.width =
+        `${((quizState.currentIndex + 1) / quizState.questions.length) * 100}%`;
+      document.getElementById('categoryBadge').textContent =
+        CATEGORY_NAMES[q.category] || q.category;
+      document.getElementById('tabSwitchCounter').textContent =
+        `Tab switches: ${quizState.tabSwitches}`;
+
+      // Difficulty badge
+      const diffClass = q.difficulty === 'basic' ? 'badge-teal' :
+                        q.difficulty === 'intermediate' ? 'badge-amber' : 'badge-red';
+      const diffLabel = q.difficulty.charAt(0).toUpperCase() + q.difficulty.slice(1);
+
+      // Type hint
+      let typeHint = '';
+      if (q.type === 'multiple') typeHint = 'Select all that apply';
+      else if (q.type === 'truefalse') typeHint = 'True or False';
+
+      // Build options HTML
+      let optionsHTML = q.options.map((opt, i) => {
+        const dataType = q.type === 'multiple' ? 'data-type="multiple"' : '';
+        return `
+          <div class="option-card" ${dataType} data-index="${i}" onclick="selectOption(${i})">
+            <div class="option-indicator">${String.fromCharCode(65 + i)}</div>
+            <div class="option-text">${opt}</div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('questionContainer').innerHTML = `
+        <div class="question-header">
+          <span class="badge ${diffClass}">${diffLabel}</span>
+          ${q.type === 'truefalse' ? '<span class="badge badge-purple">True/False</span>' : ''}
+          ${q.type === 'multiple' ? '<span class="badge badge-blue">Multi-select</span>' : ''}
+        </div>
+        <p class="question-text">${q.question}</p>
+        ${typeHint ? `<p class="question-hint">${typeHint}</p>` : ''}
+        <div class="options-list" id="optionsList">${optionsHTML}</div>
+        <div id="explanationArea"></div>
+        <div class="quiz-nav" id="quizNav" style="display:none;">
+          <button class="btn btn-primary" onclick="nextQuestion()">
+            ${quizState.currentIndex < quizState.questions.length - 1 ? 'Next Question →' : 'See Results →'}
+          </button>
+        </div>
+      `;
+
+      // Start timer
+      startTimer();
+
+      // Animate in
+      document.getElementById('questionContainer').style.animation = 'none';
+      requestAnimationFrame(() => {
+        document.getElementById('questionContainer').style.animation = 'slideIn 0.3s ease';
+      });
+    }
+
+    function selectOption(index) {
+      if (quizState.answered) return;
+
+      const q = quizState.questions[quizState.currentIndex];
+      const cards = document.querySelectorAll('.option-card');
+
+      if (q.type === 'multiple') {
+        // Toggle selection
+        const idx = quizState.selectedOptions.indexOf(index);
+        if (idx > -1) {
+          quizState.selectedOptions.splice(idx, 1);
+          cards[index].classList.remove('selected');
+        } else {
+          quizState.selectedOptions.push(index);
+          cards[index].classList.add('selected');
+        }
+        // Show confirm button for multiple choice
+        showConfirmButton(q);
+      } else {
+        // Single choice / truefalse — immediate submit
+        quizState.selectedOptions = [index];
+        cards.forEach(c => c.classList.remove('selected'));
+        cards[index].classList.add('selected');
+        submitAnswer();
+      }
+    }
+
+    function showConfirmButton(q) {
+      let confirmArea = document.getElementById('confirmBtn');
+      if (!confirmArea && quizState.selectedOptions.length > 0) {
+        const nav = document.getElementById('quizNav');
+        const btn = document.createElement('div');
+        btn.id = 'confirmBtn';
+        btn.className = 'quiz-nav';
+        btn.style.marginTop = '12px';
+        btn.innerHTML = `<button class="btn btn-primary" onclick="submitAnswer()">Confirm Selection ✓</button>`;
+        nav.parentNode.insertBefore(btn, nav);
+      } else if (confirmArea && quizState.selectedOptions.length === 0) {
+        confirmArea.remove();
+      }
+    }
+
+    function submitAnswer() {
+      if (quizState.answered) return;
+      quizState.answered = true;
+      clearInterval(quizState.timer);
+
+      const q = quizState.questions[quizState.currentIndex];
+      const timeSpent = Math.round((Date.now() - quizState.questionStartTime) / 1000);
+      const selected = quizState.selectedOptions.map(i => q.options[i]);
+      const isCorrect = arraysEqual(selected.sort(), [...q.correct].sort());
+
+      // Record answer
+      quizState.answers.push({
+        questionId: q.id,
+        category: q.category,
+        selectedAnswer: selected,
+        correctAnswer: q.correct,
+        isCorrect,
+        timeSpent
+      });
+
+      // Show correct/wrong
+      const cards = document.querySelectorAll('.option-card');
+      cards.forEach((card, i) => {
+        card.classList.add('disabled');
+        const opt = q.options[i];
+        if (q.correct.includes(opt)) {
+          card.classList.add('correct');
+        } else if (selected.includes(opt)) {
+          card.classList.add('wrong');
+        }
+      });
+
+      // Remove confirm button
+      const confirmBtn = document.getElementById('confirmBtn');
+      if (confirmBtn) confirmBtn.remove();
+
+      // Show explanation
+      document.getElementById('explanationArea').innerHTML = `
+        <div class="explanation-box">
+          <div class="explanation-label">${isCorrect ? '✅ Correct' : '❌ Incorrect'}</div>
+          <div class="explanation-text">${q.explanation}</div>
+          <a href="${q.higReference}" target="_blank" rel="noopener" class="hig-link">
+            View HIG Reference →
+          </a>
+        </div>`;
+
+      // Show next button
+      document.getElementById('quizNav').style.display = 'flex';
+    }
+
+    function nextQuestion() {
+      quizState.currentIndex++;
+      if (quizState.currentIndex >= quizState.questions.length) {
+        finishQuiz();
+      } else {
+        renderQuestion();
+      }
+    }
+
+    function timeOut() {
+      if (quizState.answered) return;
+      // Auto-submit with no selection
+      quizState.selectedOptions = [];
+      submitAnswer();
+    }
+
+    // Timer
+    function startTimer() {
+      quizState.timeLeft = TIME_PER_QUESTION;
+      const timerEl = document.getElementById('timerValue');
+      timerEl.textContent = quizState.timeLeft;
+      timerEl.className = 'timer-value';
+
+      clearInterval(quizState.timer);
+      quizState.timer = setInterval(() => {
+        quizState.timeLeft--;
+        timerEl.textContent = quizState.timeLeft;
+
+        if (quizState.timeLeft <= 5) {
+          timerEl.className = 'timer-value critical';
+        } else if (quizState.timeLeft <= 15) {
+          timerEl.className = 'timer-value warning';
+        } else {
+          timerEl.className = 'timer-value';
+        }
+
+        if (quizState.timeLeft <= 0) {
+          clearInterval(quizState.timer);
+          timeOut();
+        }
+      }, 1000);
+    }
+
+    // Helpers
+    function arraysEqual(a, b) {
+      if (a.length !== b.length) return false;
+      return a.every((v, i) => v === b[i]);
+    }
+
+
+    // =====================================================
+    // 14: QUIZ COMPLETION & RESULTS
+    // =====================================================
+
+    async function finishQuiz() {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(quizState.timer);
+      showLoading();
+
+      const totalDuration = Math.round((Date.now() - quizState.startTime) / 1000);
+      const correct = quizState.answers.filter(a => a.isCorrect).length;
+      const percentage = Math.round((correct / quizState.questions.length) * 100);
+      const level = getLevel(percentage);
+
+      // Category breakdown
+      const categories = {};
+      quizState.answers.forEach(a => {
+        if (!categories[a.category]) categories[a.category] = { correct: 0, total: 0 };
+        categories[a.category].total++;
+        if (a.isCorrect) categories[a.category].correct++;
+      });
+      Object.keys(categories).forEach(k => {
+        categories[k].percentage = Math.round((categories[k].correct / categories[k].total) * 100);
+      });
+
+      // Recommendations
+      const recommendations = generateRecommendations(categories);
+
+      // Build result object
+      const resultData = {
+        name: currentUser.displayName || '',
+        email: currentUser.email,
+        photoURL: currentUser.photoURL || '',
+        score: correct,
+        totalQuestions: quizState.questions.length,
+        percentage,
+        level,
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        duration: totalDuration,
+        tabSwitches: quizState.tabSwitches,
+        attemptNumber: 1,
+        categories,
+        answers: quizState.answers,
+        recommendations
+      };
+
+      // Save to Firestore
+      try {
+        // Check if there's an archived attempt
+        const archiveSnap = await db.collection('results_archive')
+          .where('email', '==', currentUser.email)
+          .get();
+        resultData.attemptNumber = archiveSnap.size + 1;
+
+        await db.collection('results').doc(currentUser.email).set(resultData);
+      } catch (err) {
+        console.error('Error saving results:', err);
+      }
+
+      // Send email notification
+      sendEmailNotification(resultData, categories);
+
+      hideLoading();
+      renderResults(resultData);
+    }
+
+    function getLevel(pct) {
+      if (pct >= 90) return 'HIG Master';
+      if (pct >= 75) return 'HIG Proficient';
+      if (pct >= 60) return 'HIG Practitioner';
+      if (pct >= 40) return 'HIG Explorer';
+      return 'HIG Novice';
+    }
+
+    function getLevelColor(level) {
+      const map = {
+        'HIG Master': 'var(--accent-teal)',
+        'HIG Proficient': 'var(--accent-blue)',
+        'HIG Practitioner': 'var(--accent-amber)',
+        'HIG Explorer': 'var(--accent-orange)',
+        'HIG Novice': 'var(--accent-red)'
+      };
+      return map[level] || 'var(--text-primary)';
+    }
+
+    function getLevelBg(level) {
+      const map = {
+        'HIG Master': 'rgba(0, 212, 180, 0.15)',
+        'HIG Proficient': 'rgba(59, 130, 246, 0.15)',
+        'HIG Practitioner': 'rgba(245, 158, 11, 0.15)',
+        'HIG Explorer': 'rgba(249, 115, 22, 0.15)',
+        'HIG Novice': 'rgba(239, 68, 68, 0.15)'
+      };
+      return map[level] || 'rgba(255,255,255,0.1)';
+    }
+
+    function generateRecommendations(categories) {
+      const recMap = {
+        'typography-color': {
+          name: 'Typography & Color',
+          tips: ['Review SF Pro font family and Dynamic Type support', 'Study semantic colors and dark mode adaptation', 'Understand font weight recommendations for different text styles'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/typography', 'https://developer.apple.com/design/human-interface-guidelines/color']
+        },
+        'layout-spacing': {
+          name: 'Layout & Spacing',
+          tips: ['Learn safe area insets and their impact on layout', 'Study Auto Layout principles and readable content width', 'Review standard margin and spacing recommendations'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/layout']
+        },
+        'icons-images': {
+          name: 'Icons & Images',
+          tips: ['Explore SF Symbols rendering modes and weight matching', 'Study app icon specifications (no transparency, corner radius)', 'Review image resolution requirements (@1x, @2x, @3x)'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/sf-symbols', 'https://developer.apple.com/design/human-interface-guidelines/app-icons']
+        },
+        'navigation': {
+          name: 'Navigation & Structure',
+          tips: ['Understand tab bar vs sidebar navigation patterns', 'Study when to use modal vs push navigation', 'Review navigation bar best practices'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/tab-bars', 'https://developer.apple.com/design/human-interface-guidelines/navigation']
+        },
+        'controls': {
+          name: 'Controls',
+          tips: ['Learn the three standard button styles (Filled, Tinted, Plain)', 'Study toggle, picker, and segmented control usage', 'Review slider and text field best practices'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/buttons', 'https://developer.apple.com/design/human-interface-guidelines/toggles']
+        },
+        'feedback-status': {
+          name: 'Feedback & Status',
+          tips: ['Understand alert vs action sheet decision criteria', 'Study progress indicator types (determinate vs indeterminate)', 'Review haptic feedback types and usage'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/alerts', 'https://developer.apple.com/design/human-interface-guidelines/action-sheets']
+        },
+        'user-input': {
+          name: 'User Input & Interaction',
+          tips: ['Review standard iOS gestures and their meanings', 'Study permission request timing best practices', 'Understand onboarding guidelines'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/gestures', 'https://developer.apple.com/design/human-interface-guidelines/privacy']
+        },
+        'accessibility': {
+          name: 'Accessibility & Inclusivity',
+          tips: ['Learn minimum touch target requirements (44×44 pt)', 'Study VoiceOver support and accessibility labels', 'Review Reduce Motion and color contrast requirements'],
+          links: ['https://developer.apple.com/design/human-interface-guidelines/accessibility']
+        }
+      };
+
+      const recs = [];
+      Object.entries(categories).forEach(([key, cat]) => {
+        const data = recMap[key];
+        if (!data) return;
+        let status = 'strong';
+        if (cat.percentage < 60) status = 'weak';
+        else if (cat.percentage < 100) status = 'moderate';
+
+        recs.push({
+          category: data.name,
+          status,
+          tips: data.tips,
+          links: data.links
+        });
+      });
+
+      return recs;
+    }
+
+    function renderResults(data) {
+      document.getElementById('resScore').textContent = `${data.score}/${data.totalQuestions}`;
+      document.getElementById('resPct').textContent = `${data.percentage}%`;
+
+      const levelEl = document.getElementById('resLevel');
+      levelEl.textContent = data.level;
+      levelEl.style.background = getLevelBg(data.level);
+      levelEl.style.color = getLevelColor(data.level);
+
+      // Category grid
+      const catGrid = document.getElementById('categoryGrid');
+      catGrid.innerHTML = '';
+      Object.entries(data.categories).forEach(([key, cat]) => {
+        const status = cat.percentage >= 80 ? 'teal' : cat.percentage >= 50 ? 'amber' : 'red';
+        catGrid.innerHTML += `
+          <div class="card category-card">
+            <div class="cat-left">
+              <div class="cat-status" style="background:var(--accent-${status})"></div>
+              <span class="cat-name">${CATEGORY_NAMES[key] || key}</span>
+            </div>
+            <span class="cat-score">${cat.correct}/${cat.total}</span>
+          </div>`;
+      });
+
+      // Time stats
+      const times = data.answers.map(a => a.timeSpent);
+      const avgTime = Math.round(times.reduce((s, t) => s + t, 0) / times.length);
+      const fastest = Math.min(...times);
+      const slowest = Math.max(...times);
+      document.getElementById('timeStats').innerHTML = `
+        <div class="card time-stat-card">
+          <div class="stat-value">${avgTime}s</div>
+          <div class="stat-label">Avg per question</div>
+        </div>
+        <div class="card time-stat-card">
+          <div class="stat-value">${fastest}s</div>
+          <div class="stat-label">Fastest</div>
+        </div>
+        <div class="card time-stat-card">
+          <div class="stat-value">${formatTime(data.duration)}</div>
+          <div class="stat-label">Total time</div>
+        </div>`;
+
+      // Recommendations
+      const recsEl = document.getElementById('recommendations');
+      recsEl.innerHTML = '';
+      data.recommendations
+        .sort((a, b) => {
+          const order = { weak: 0, moderate: 1, strong: 2 };
+          return order[a.status] - order[b.status];
+        })
+        .forEach(rec => {
+          const statusColor = rec.status === 'strong' ? 'teal' : rec.status === 'moderate' ? 'amber' : 'red';
+          const statusLabel = rec.status === 'strong' ? '✅ Strength' : rec.status === 'moderate' ? '⚠️ Good but review' : '❌ Focus area';
+
+          recsEl.innerHTML += `
+            <div class="card rec-card">
+              <div class="rec-header">
+                <span class="rec-title">${rec.category}</span>
+                <span class="badge badge-${statusColor}">${statusLabel}</span>
+              </div>
+              ${rec.status !== 'strong' ? `
+                <ul class="rec-tips">
+                  ${rec.tips.map(t => `<li>${t}</li>`).join('')}
+                </ul>
+                ${rec.links.map(l => `<a href="${l}" target="_blank" rel="noopener" class="rec-link">Study this HIG section →</a>`).join('')}
+              ` : '<p style="font-size:13px;color:var(--text-muted);">Great job — keep it up!</p>'}
+            </div>`;
+        });
+
+      // Tab switch warning
+      if (data.tabSwitches > 3) {
+        const warn = document.getElementById('tabSwitchWarning');
+        warn.textContent = `⚠️ ${data.tabSwitches} tab switches were detected during the quiz`;
+        warn.classList.remove('hidden');
+      }
+
+      // Radar chart
+      renderRadarChart('radarChart', data.categories);
+
+      showScreen('results');
+    }
+
+    function renderRadarChart(canvasId, categories) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+
+      // Destroy existing chart if any
+      if (canvas._chart) canvas._chart.destroy();
+
+      const labels = Object.keys(categories).map(k => CATEGORY_NAMES[k] || k);
+      const values = Object.values(categories).map(c => c.percentage);
+
+      canvas._chart = new Chart(ctx, {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Score %',
+            data: values,
+            backgroundColor: 'rgba(0, 212, 180, 0.15)',
+            borderColor: 'rgba(0, 212, 180, 0.8)',
+            borderWidth: 2,
+            pointBackgroundColor: '#00D4B4',
+            pointBorderColor: '#00D4B4',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                stepSize: 25,
+                color: '#64748B',
+                backdropColor: 'transparent',
+                font: { family: "'DM Mono', monospace", size: 10 }
+              },
+              grid: {
+                color: 'rgba(30, 45, 69, 0.6)'
+              },
+              angleLines: {
+                color: 'rgba(30, 45, 69, 0.4)'
+              },
+              pointLabels: {
+                color: '#94A3B8',
+                font: { family: "'Inter', sans-serif", size: 11 }
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+    }
+
+    function formatTime(seconds) {
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function shareResults() {
+      const score = document.getElementById('resScore')?.textContent || document.getElementById('retScore')?.textContent;
+      const pct = document.getElementById('resPct')?.textContent || document.getElementById('retPct')?.textContent;
+      const level = document.getElementById('resLevel')?.textContent || document.getElementById('retLevel')?.textContent;
+
+      const text = `📋 Apple HIG Mastery Check Results\n\nScore: ${score} (${pct})\nLevel: ${level}\n\nTake the quiz: [your-github-pages-url]`;
+
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Results copied to clipboard!');
+      }).catch(() => {
+        // Fallback
+        prompt('Copy your results:', text);
+      });
+    }
+
+
+    // =====================================================
+    // 15: EMAIL NOTIFICATION
+    // =====================================================
+
+    function sendEmailNotification(data, categories) {
+      if (typeof emailjs === 'undefined') {
+        console.warn('EmailJS not loaded, skipping notification');
+        return;
+      }
+
+      const catBreakdown = Object.entries(categories).map(([key, cat]) => {
+        const icon = cat.percentage >= 80 ? '✅' : cat.percentage >= 50 ? '⚠️' : '❌';
+        return `${CATEGORY_NAMES[key] || key}: ${cat.correct}/${cat.total} ${icon}`;
+      }).join('\n');
+
+      const weakAreas = Object.entries(categories)
+        .filter(([, c]) => c.percentage < 60)
+        .map(([k]) => CATEGORY_NAMES[k] || k)
+        .join(', ') || 'None';
+
+      const templateParams = {
+        to_email: ADMIN_EMAIL,
+        user_name: data.name,
+        user_email: data.email,
+        score: `${data.score}/${data.totalQuestions}`,
+        percentage: `${data.percentage}%`,
+        level: data.level,
+        duration: formatTime(data.duration),
+        tab_switches: data.tabSwitches,
+        category_breakdown: catBreakdown,
+        weak_areas: weakAreas,
+        subject: `[HIG Quiz] ${data.name} scored ${data.percentage}% — ${data.level}`
+      };
+
+      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+        .then(() => console.log('Email notification sent'))
+        .catch(err => console.error('Email send error:', err));
+    }
+
+
+    // =====================================================
+    // 16: ADMIN PANEL
+    // =====================================================
+
+    async function loadAdminData() {
+      if (!currentUser || currentUser.email !== ADMIN_EMAIL) return;
+
+      try {
+        const snap = await db.collection('results').get();
+        allResults = [];
+        snap.forEach(doc => allResults.push(doc.data()));
+
+        renderAdminStats();
+        renderAdminCharts();
+        renderLeaderboard();
+      } catch (err) {
+        console.error('Admin data load error:', err);
+      }
+    }
+
+    function renderAdminStats() {
+      const total = allResults.length;
+      const avg = total > 0 ? Math.round(allResults.reduce((s, r) => s + r.percentage, 0) / total) : 0;
+      const top = total > 0 ? Math.max(...allResults.map(r => r.percentage)) : 0;
+
+      // Find weakest category
+      const catAverages = {};
+      allResults.forEach(r => {
+        Object.entries(r.categories || {}).forEach(([k, c]) => {
+          if (!catAverages[k]) catAverages[k] = { sum: 0, count: 0 };
+          catAverages[k].sum += c.percentage;
+          catAverages[k].count++;
+        });
+      });
+
+      let weakest = '—';
+      let lowestAvg = 101;
+      Object.entries(catAverages).forEach(([k, v]) => {
+        const a = v.sum / v.count;
+        if (a < lowestAvg) {
+          lowestAvg = a;
+          weakest = CATEGORY_NAMES[k] || k;
+        }
+      });
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statAvg').textContent = `${avg}%`;
+      document.getElementById('statTop').textContent = total > 0 ? `${top}%` : '—';
+      document.getElementById('statWeakest').textContent = weakest;
+      document.getElementById('statWeakest').style.fontSize = '16px';
+    }
+
+    function renderAdminCharts() {
+      // Score distribution bar chart
+      const distCanvas = document.getElementById('adminDistChart');
+      const distCtx = distCanvas.getContext('2d');
+      if (distCanvas._chart) distCanvas._chart.destroy();
+
+      const buckets = { 'HIG Novice (0-39%)': 0, 'HIG Explorer (40-59%)': 0, 'HIG Practitioner (60-74%)': 0, 'HIG Proficient (75-89%)': 0, 'HIG Master (90-100%)': 0 };
+      allResults.forEach(r => {
+        if (r.percentage >= 90) buckets['HIG Master (90-100%)']++;
+        else if (r.percentage >= 75) buckets['HIG Proficient (75-89%)']++;
+        else if (r.percentage >= 60) buckets['HIG Practitioner (60-74%)']++;
+        else if (r.percentage >= 40) buckets['HIG Explorer (40-59%)']++;
+        else buckets['HIG Novice (0-39%)']++;
+      });
+
+      distCanvas._chart = new Chart(distCtx, {
+        type: 'bar',
+        data: {
+          labels: Object.keys(buckets),
+          datasets: [{
+            data: Object.values(buckets),
+            backgroundColor: [
+              'rgba(239, 68, 68, 0.6)',
+              'rgba(249, 115, 22, 0.6)',
+              'rgba(245, 158, 11, 0.6)',
+              'rgba(59, 130, 246, 0.6)',
+              'rgba(0, 212, 180, 0.6)'
+            ],
+            borderColor: [
+              '#EF4444', '#F97316', '#F59E0B', '#3B82F6', '#00D4B4'
+            ],
+            borderWidth: 1,
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                stepSize: 1,
+                color: '#64748B',
+                font: { family: "'DM Mono', monospace", size: 11 }
+              },
+              grid: { color: 'rgba(30, 45, 69, 0.4)' }
+            },
+            x: {
+              ticks: {
+                color: '#94A3B8',
+                font: { family: "'Inter', sans-serif", size: 10 },
+                maxRotation: 45
+              },
+              grid: { display: false }
+            }
+          }
+        }
+      });
+
+      // Average category radar
+      const radarCanvas = document.getElementById('adminRadarChart');
+      const radarCtx = radarCanvas.getContext('2d');
+      if (radarCanvas._chart) radarCanvas._chart.destroy();
+
+      const catAverages = {};
+      allResults.forEach(r => {
+        Object.entries(r.categories || {}).forEach(([k, c]) => {
+          if (!catAverages[k]) catAverages[k] = { sum: 0, count: 0 };
+          catAverages[k].sum += c.percentage;
+          catAverages[k].count++;
+        });
+      });
+
+      const radarLabels = Object.keys(catAverages).map(k => CATEGORY_NAMES[k] || k);
+      const radarValues = Object.values(catAverages).map(v => Math.round(v.sum / v.count));
+
+      radarCanvas._chart = new Chart(radarCtx, {
+        type: 'radar',
+        data: {
+          labels: radarLabels,
+          datasets: [{
+            label: 'Team Average %',
+            data: radarValues,
+            backgroundColor: 'rgba(59, 130, 246, 0.15)',
+            borderColor: 'rgba(59, 130, 246, 0.8)',
+            borderWidth: 2,
+            pointBackgroundColor: '#3B82F6',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 100,
+              ticks: {
+                stepSize: 25,
+                color: '#64748B',
+                backdropColor: 'transparent',
+                font: { family: "'DM Mono', monospace", size: 10 }
+              },
+              grid: { color: 'rgba(30, 45, 69, 0.6)' },
+              angleLines: { color: 'rgba(30, 45, 69, 0.4)' },
+              pointLabels: {
+                color: '#94A3B8',
+                font: { family: "'Inter', sans-serif", size: 10 }
+              }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function renderLeaderboard() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const levelFilter = document.getElementById('filterLevel').value;
+
+      let filtered = [...allResults];
+
+      if (search) {
+        filtered = filtered.filter(r =>
+          (r.name || '').toLowerCase().includes(search) ||
+          (r.email || '').toLowerCase().includes(search)
+        );
+      }
+      if (levelFilter) {
+        filtered = filtered.filter(r => r.level === levelFilter);
+      }
+
+      // Sort
+      filtered.sort((a, b) => {
+        let va, vb;
+        switch (adminSortField) {
+          case 'name': va = a.name || ''; vb = b.name || ''; break;
+          case 'score': va = a.percentage; vb = b.percentage; break;
+          case 'level':
+            const levelOrder = { 'HIG Master': 5, 'HIG Proficient': 4, 'HIG Practitioner': 3, 'HIG Explorer': 2, 'HIG Novice': 1 };
+            va = levelOrder[a.level] || 0; vb = levelOrder[b.level] || 0; break;
+          case 'date':
+            va = a.completedAt?.seconds || 0; vb = b.completedAt?.seconds || 0; break;
+          default: va = a.percentage; vb = b.percentage;
+        }
+        if (typeof va === 'string') {
+          return adminSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        }
+        return adminSortDir === 'asc' ? va - vb : vb - va;
+      });
+
+      const tbody = document.getElementById('leaderboardBody');
+      tbody.innerHTML = filtered.map((r, i) => {
+        const date = r.completedAt?.toDate ? r.completedAt.toDate().toLocaleDateString() : '—';
+        const levelColor = getLevelColor(r.level).replace('var(--accent-', '').replace(')', '');
+        return `
+          <tr>
+            <td style="font-family:var(--font-mono);color:var(--text-muted);">${i + 1}</td>
+            <td>
+              <div class="user-cell">
+                <img src="${r.photoURL || ''}" alt="" onerror="this.style.display='none'">
+                <div>
+                  <div class="user-name">${r.name || '—'}</div>
+                  <div class="user-email">${r.email}</div>
+                </div>
+              </div>
+            </td>
+            <td class="score-cell">${r.score}/${r.totalQuestions} (${r.percentage}%)</td>
+            <td><span class="badge badge-${levelColor === 'teal' ? 'teal' : levelColor === 'blue' ? 'blue' : levelColor === 'amber' ? 'amber' : levelColor === 'orange' ? 'orange' : 'red'}">${r.level}</span></td>
+            <td style="font-size:13px;color:var(--text-secondary);">${date}</td>
+            <td style="font-family:var(--font-mono);font-size:13px;">${formatTime(r.duration || 0)}</td>
+            <td style="font-family:var(--font-mono);font-size:13px;${r.tabSwitches > 3 ? 'color:var(--accent-red);' : ''}">${r.tabSwitches || 0}</td>
+            <td>
+              <div class="actions-cell">
+                <button class="btn btn-secondary btn-sm" onclick="showUserDetail('${r.email}')">Details</button>
+                <button class="btn btn-danger btn-sm" onclick="resetUser('${r.email}', '${r.name}')">Reset</button>
+              </div>
+            </td>
+          </tr>`;
+      }).join('');
+    }
+
+    function filterLeaderboard() {
+      renderLeaderboard();
+    }
+
+    function sortLeaderboard(field) {
+      if (adminSortField === field) {
+        adminSortDir = adminSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        adminSortField = field;
+        adminSortDir = 'desc';
+      }
+      renderLeaderboard();
+    }
+
+    function showUserDetail(email) {
+      const user = allResults.find(r => r.email === email);
+      if (!user) return;
+
+      document.getElementById('modalUserName').textContent = user.name || user.email;
+
+      let answersHTML = '';
+      if (user.answers && user.answers.length > 0) {
+        answersHTML = user.answers.map((a, i) => {
+          const q = QUESTION_BANK.find(q => q.id === a.questionId);
+          const icon = a.isCorrect ? '✅' : '❌';
+          return `
+            <div class="modal-answer-item">
+              <div class="q-text">${icon} Q${i + 1}: ${q ? q.question.substring(0, 80) + '...' : a.questionId}</div>
+              <div class="q-result">
+                Selected: ${a.selectedAnswer.join(', ') || 'None'} | 
+                Correct: ${a.correctAnswer.join(', ')} | 
+                Time: ${a.timeSpent}s
+              </div>
+            </div>`;
+        }).join('');
+      }
+
+      document.getElementById('modalBody').innerHTML = `
+        <div class="modal-section">
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+            <div class="card time-stat-card">
+              <div class="stat-value">${user.score}/${user.totalQuestions}</div>
+              <div class="stat-label">Score</div>
+            </div>
+            <div class="card time-stat-card">
+              <div class="stat-value">${user.percentage}%</div>
+              <div class="stat-label">Percentage</div>
+            </div>
+            <div class="card time-stat-card">
+              <div class="stat-value">${formatTime(user.duration || 0)}</div>
+              <div class="stat-label">Duration</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-section">
+          <h4>Category Breakdown</h4>
+          ${Object.entries(user.categories || {}).map(([k, c]) => {
+            const status = c.percentage >= 80 ? 'teal' : c.percentage >= 50 ? 'amber' : 'red';
+            return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(30,45,69,0.4);font-size:14px;">
+              <span style="display:flex;align-items:center;gap:8px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--accent-${status});"></span>
+                ${CATEGORY_NAMES[k] || k}
+              </span>
+              <span style="font-family:var(--font-mono);font-size:13px;">${c.correct}/${c.total} (${c.percentage}%)</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div class="modal-section">
+          <h4>Answer Details</h4>
+          <div class="modal-answers-list">${answersHTML || '<p style="color:var(--text-muted);font-size:13px;">No answer details available</p>'}</div>
+        </div>
+        <div class="modal-section">
+          <p style="font-size:13px;color:var(--text-muted);">
+            Attempt #${user.attemptNumber || 1} · Tab switches: ${user.tabSwitches || 0}
+          </p>
+        </div>`;
+
+      document.getElementById('userDetailModal').classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('userDetailModal').classList.remove('active');
+    }
+
+    async function resetUser(email, name) {
+      if (!confirm(`Are you sure you want to reset ${name}'s quiz attempt? They will be able to take the quiz again.`)) return;
+
+      try {
+        showLoading();
+        // Archive the result
+        const doc = await db.collection('results').doc(email).get();
+        if (doc.exists) {
+          const data = doc.data();
+          await db.collection('results_archive').add({
+            ...data,
+            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            archivedBy: ADMIN_EMAIL
+          });
+          // Delete current result
+          await db.collection('results').doc(email).delete();
+        }
+
+        // Reload admin data
+        await loadAdminData();
+        hideLoading();
+        alert(`${name}'s attempt has been reset and archived.`);
+      } catch (err) {
+        hideLoading();
+        console.error('Reset error:', err);
+        alert('Error resetting user. Check console for details.');
+      }
+    }
+
+    function exportCSV() {
+      if (allResults.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+
+      const headers = ['Name', 'Email', 'Score', 'Total', 'Percentage', 'Level', 'Duration (s)', 'Tab Switches', 'Attempt', 'Date'];
+
+      // Add category headers
+      const catKeys = Object.keys(CATEGORY_NAMES);
+      catKeys.forEach(k => headers.push(CATEGORY_NAMES[k]));
+
+      const rows = allResults.map(r => {
+        const date = r.completedAt?.toDate ? r.completedAt.toDate().toISOString() : '';
+        const row = [
+          r.name, r.email, r.score, r.totalQuestions, r.percentage,
+          r.level, r.duration, r.tabSwitches, r.attemptNumber || 1, date
+        ];
+        catKeys.forEach(k => {
+          const cat = r.categories?.[k];
+          row.push(cat ? `${cat.correct}/${cat.total}` : '—');
+        });
+        return row;
+      });
+
+      let csv = headers.join(',') + '\n';
+      rows.forEach(row => {
+        csv += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+      });
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hig-quiz-results-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('userDetailModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('userDetailModal')) closeModal();
+    });
+
+    // Close modal on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+  </script>
+</body>
+</html>
