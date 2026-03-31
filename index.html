@@ -334,7 +334,7 @@
     /* =====================================================
        2: AUTH SCREEN
        ===================================================== */
-    .auth-screen {
+    .auth-screen.active {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -493,7 +493,7 @@
     /* =====================================================
        4: QUIZ SCREEN
        ===================================================== */
-    .quiz-screen {
+    .quiz-screen.active {
       min-height: calc(100vh - 65px);
       display: flex;
       flex-direction: column;
@@ -1343,7 +1343,7 @@
 
   <!-- App Header -->
   <header class="app-header">
-    <div class="logo">
+    <div class="logo" onclick="goHome()" style="cursor:pointer;">
       <span class="apple-icon"></span>
       <span>HIG Mastery Check</span>
     </div>
@@ -2373,6 +2373,23 @@
     // =====================================================
     // 12: SCREEN MANAGEMENT
     // =====================================================
+
+    function goHome() {
+      if (!currentUser) {
+        showScreen('auth');
+        return;
+      }
+      // If user has completed quiz, show returning screen
+      db.collection('results').doc(currentUser.email).get().then(doc => {
+        if (doc.exists) {
+          showReturningUser(doc.data());
+        } else {
+          showScreen('prequiz');
+        }
+      }).catch(() => {
+        showScreen('prequiz');
+      });
+    }
 
     function showScreen(name) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
