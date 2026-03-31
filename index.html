@@ -26,10 +26,15 @@
             request.auth.token.email.matches('.*@jatapp[.]com');
           allow write: if request.auth != null && request.auth.token.email == email;
           allow delete: if request.auth != null && 
-            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+            (request.auth.token.email == email ||
+             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com');
         }
         match /results_archive/{doc} {
-          allow read, write: if request.auth != null && 
+          allow read: if request.auth != null && 
+            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+          allow create: if request.auth != null && 
+            request.auth.token.email.matches('.*@jatapp[.]com');
+          allow update, delete: if request.auth != null && 
             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
         }
       }
@@ -1730,6 +1735,7 @@
           <div class="dash-level-badge" id="dashLevel">HIG Practitioner</div>
           <div class="dash-user-name" id="dashUserName"></div>
           <div class="dash-meta" id="dashMeta"></div>
+          <button class="btn btn-secondary" style="margin-top:12px;" onclick="retakeQuiz()">🔄 Retake Quiz</button>
         </div>
       </div>
 
@@ -1821,6 +1827,7 @@
         <h2 class="admin-title" style="margin-bottom:0;">⚙️ Admin Panel</h2>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📥 Export CSV</button>
+          <button class="btn btn-secondary btn-sm" onclick="seedDemoData()">🧪 Seed Demo Data</button>
           <button class="btn btn-secondary btn-sm" onclick="goHome()">← Back</button>
         </div>
       </div>
@@ -2627,6 +2634,33 @@
       }).catch(() => {
         showScreen('prequiz');
       });
+    }
+
+    async function retakeQuiz() {
+      if (!currentUser) return;
+      if (!confirm('Are you sure you want to retake the quiz? Your current results will be archived.')) return;
+
+      try {
+        showLoading();
+        // Archive current result
+        const doc = await db.collection('results').doc(currentUser.email).get();
+        if (doc.exists) {
+          const data = doc.data();
+          await db.collection('results_archive').add({
+            ...data,
+            archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            archivedBy: currentUser.email
+          });
+          // Delete current result
+          await db.collection('results').doc(currentUser.email).delete();
+        }
+        hideLoading();
+        showScreen('prequiz');
+      } catch (err) {
+        hideLoading();
+        console.error('Retake error:', err);
+        alert('Error archiving results. You may not have permission. Contact admin.');
+      }
     }
 
     function showScreen(name) {
@@ -3961,6 +3995,73 @@
       a.download = `hig-quiz-results-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    }
+
+    async function seedDemoData() {
+      if (!currentUser || currentUser.email !== ADMIN_EMAIL) return;
+      if (!confirm('This will add 5 demo users to the leaderboard. Continue?')) return;
+
+      showLoading();
+
+      const demoUsers = [
+        { name: 'Anna Kovalenko', email: 'anna.kovalenko@jatapp.com', score: 23, pct: 92, level: 'HIG Master', duration: 1122, tabs: 0 },
+        { name: 'Dmytro Sydorenko', email: 'dmytro.sydorenko@jatapp.com', score: 20, pct: 80, level: 'HIG Proficient', duration: 1340, tabs: 1 },
+        { name: 'Olena Marchenko', email: 'olena.marchenko@jatapp.com', score: 17, pct: 68, level: 'HIG Practitioner', duration: 980, tabs: 0 },
+        { name: 'Yurii Bondar', email: 'yurii.bondar@jatapp.com', score: 14, pct: 56, level: 'HIG Explorer', duration: 1450, tabs: 3 },
+        { name: 'Svitlana Tkachuk', email: 'svitlana.tkachuk@jatapp.com', score: 21, pct: 84, level: 'HIG Proficient', duration: 1100, tabs: 0 }
+      ];
+
+      const catTemplates = [
+        // HIG Master profile
+        { 'typography-color': {c:4,t:4}, 'layout-spacing': {c:3,t:3}, 'icons-images': {c:3,t:3}, 'navigation': {c:3,t:3}, 'controls': {c:3,t:3}, 'feedback-status': {c:3,t:3}, 'user-input': {c:2,t:3}, 'accessibility': {c:2,t:3} },
+        // HIG Proficient
+        { 'typography-color': {c:3,t:3}, 'layout-spacing': {c:3,t:4}, 'icons-images': {c:2,t:3}, 'navigation': {c:3,t:3}, 'controls': {c:3,t:3}, 'feedback-status': {c:2,t:3}, 'user-input': {c:2,t:3}, 'accessibility': {c:2,t:3} },
+        // HIG Practitioner
+        { 'typography-color': {c:2,t:3}, 'layout-spacing': {c:2,t:3}, 'icons-images': {c:3,t:4}, 'navigation': {c:2,t:3}, 'controls': {c:2,t:3}, 'feedback-status': {c:2,t:3}, 'user-input': {c:2,t:3}, 'accessibility': {c:2,t:3} },
+        // HIG Explorer
+        { 'typography-color': {c:2,t:3}, 'layout-spacing': {c:1,t:3}, 'icons-images': {c:2,t:3}, 'navigation': {c:2,t:4}, 'controls': {c:2,t:3}, 'feedback-status': {c:1,t:3}, 'user-input': {c:2,t:3}, 'accessibility': {c:2,t:3} },
+        // HIG Proficient #2
+        { 'typography-color': {c:3,t:3}, 'layout-spacing': {c:3,t:3}, 'icons-images': {c:3,t:4}, 'navigation': {c:3,t:3}, 'controls': {c:2,t:3}, 'feedback-status': {c:3,t:3}, 'user-input': {c:2,t:3}, 'accessibility': {c:2,t:3} }
+      ];
+
+      try {
+        for (let i = 0; i < demoUsers.length; i++) {
+          const u = demoUsers[i];
+          const cats = {};
+          Object.entries(catTemplates[i]).forEach(([k, v]) => {
+            cats[k] = { correct: v.c, total: v.t, percentage: Math.round((v.c / v.t) * 100) };
+          });
+
+          const daysAgo = Math.floor(Math.random() * 14) + 1;
+          const completedDate = new Date();
+          completedDate.setDate(completedDate.getDate() - daysAgo);
+
+          await db.collection('results').doc(u.email).set({
+            name: u.name,
+            email: u.email,
+            photoURL: '',
+            score: u.score,
+            totalQuestions: 25,
+            percentage: u.pct,
+            level: u.level,
+            completedAt: firebase.firestore.Timestamp.fromDate(completedDate),
+            duration: u.duration,
+            tabSwitches: u.tabs,
+            attemptNumber: 1,
+            categories: cats,
+            answers: [],
+            recommendations: generateRecommendations(cats)
+          });
+        }
+
+        hideLoading();
+        alert('5 demo users added to the leaderboard!');
+        loadAdminData();
+      } catch (err) {
+        hideLoading();
+        console.error('Seed error:', err);
+        alert('Error seeding data: ' + err.message);
+      }
     }
 
     // Close modal on backdrop click
