@@ -24,18 +24,24 @@
         match /results/{email} {
           allow read: if request.auth != null && 
             request.auth.token.email.matches('.*@jatapp[.]com');
-          allow write: if request.auth != null && request.auth.token.email == email;
+          allow write: if request.auth != null && 
+            (request.auth.token.email == email || 
+             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com' ||
+             request.auth.token.email == 'inara.kalimulina@jatapp.com');
           allow delete: if request.auth != null && 
             (request.auth.token.email == email ||
-             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com');
+             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com' ||
+             request.auth.token.email == 'inara.kalimulina@jatapp.com');
         }
         match /results_archive/{doc} {
           allow read: if request.auth != null && 
-            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+            (request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com' ||
+             request.auth.token.email == 'inara.kalimulina@jatapp.com');
           allow create: if request.auth != null && 
             request.auth.token.email.matches('.*@jatapp[.]com');
           allow update, delete: if request.auth != null && 
-            request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
+            (request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com' ||
+             request.auth.token.email == 'inara.kalimulina@jatapp.com');
         }
       }
     }
@@ -1939,7 +1945,8 @@
     const EMAILJS_PUBLIC_KEY = "YOUR_PUBLIC_KEY";
 
     // ── Constants ──
-    const ADMIN_EMAIL = "mykhailo.mirzaiev@jatapp.com";
+    const ADMIN_EMAILS = ["mykhailo.mirzaiev@jatapp.com", "inara.kalimulina@jatapp.com"];
+    function isAdmin(email) { return ADMIN_EMAILS.includes(email); }
     const ALLOWED_DOMAIN = "jatapp.com";
     const QUESTIONS_PER_SESSION = 25;
     const TIME_PER_QUESTION = 60;
@@ -2612,7 +2619,7 @@
       document.getElementById('headerUser').classList.remove('hidden');
       document.getElementById('btnSignOut').classList.remove('hidden');
 
-      if (user.email === ADMIN_EMAIL) {
+      if (isAdmin(user.email)) {
         document.getElementById('btnAdmin').classList.remove('hidden');
       }
     }
@@ -3592,7 +3599,7 @@
         .join(', ') || 'None';
 
       const templateParams = {
-        to_email: ADMIN_EMAIL,
+        to_email: ADMIN_EMAILS[0],
         user_name: data.name,
         user_email: data.email,
         score: `${data.score}/${data.totalQuestions}`,
@@ -3616,7 +3623,7 @@
     // =====================================================
 
     async function loadAdminData() {
-      if (!currentUser || currentUser.email !== ADMIN_EMAIL) return;
+      if (!currentUser || !isAdmin(currentUser.email)) return;
 
       try {
         const snap = await db.collection('results').get();
@@ -3943,7 +3950,7 @@
           await db.collection('results_archive').add({
             ...data,
             archivedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            archivedBy: ADMIN_EMAIL
+            archivedBy: currentUser.email
           });
           // Delete current result
           await db.collection('results').doc(email).delete();
@@ -4000,7 +4007,7 @@
     }
 
     async function seedDemoData() {
-      if (!currentUser || currentUser.email !== ADMIN_EMAIL) return;
+      if (!currentUser || !isAdmin(currentUser.email)) return;
       if (!confirm('This will add 5 demo users to the leaderboard. Continue?')) return;
 
       showLoading();
