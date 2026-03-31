@@ -23,11 +23,8 @@
       match /databases/{database}/documents {
         match /results/{email} {
           allow read: if request.auth != null && 
-            (request.auth.token.email == email || 
-             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com');
+            request.auth.token.email.matches('.*@jatapp[.]com');
           allow write: if request.auth != null && request.auth.token.email == email;
-        }
-        match /results/{email} {
           allow delete: if request.auth != null && 
             request.auth.token.email == 'mykhailo.mirzaiev@jatapp.com';
         }
@@ -766,39 +763,272 @@
     }
 
     /* =====================================================
-       5: RESULTS SCREEN
+       5: DASHBOARD SCREEN (Results + Leaderboard + Study)
        ===================================================== */
-    .results-screen .container {
-      max-width: 800px;
+    .dashboard-screen .container-wide {
+      max-width: 1000px;
     }
 
-    .results-header {
+    /* Hero score banner */
+    .dash-hero {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      padding: 32px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 20px;
+      backdrop-filter: blur(12px);
+      margin-bottom: 24px;
+    }
+
+    .dash-hero-left {
       text-align: center;
-      margin-bottom: 40px;
+      padding-right: 32px;
+      border-right: 1px solid var(--border-card);
     }
 
-    .results-score {
+    .dash-score {
       font-family: var(--font-heading);
-      font-size: 72px;
+      font-size: 56px;
       font-weight: 800;
       line-height: 1;
       margin-bottom: 4px;
     }
 
-    .results-pct {
+    .dash-pct {
       font-family: var(--font-mono);
-      font-size: 28px;
+      font-size: 22px;
       color: var(--text-secondary);
+    }
+
+    .dash-hero-right {
+      flex: 1;
+    }
+
+    .dash-level-badge {
+      font-family: var(--font-heading);
+      font-size: 20px;
+      font-weight: 600;
+      padding: 6px 20px;
+      border-radius: 10px;
+      display: inline-block;
+      margin-bottom: 8px;
+    }
+
+    .dash-user-name {
+      font-size: 15px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+
+    .dash-meta {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Tab navigation */
+    .dash-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(30, 45, 69, 0.4);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 28px;
+      border: 1px solid var(--border-card);
+    }
+
+    .dash-tab {
+      flex: 1;
+      padding: 12px 16px;
+      font-family: var(--font-body);
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .dash-tab:hover {
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .dash-tab.active {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Tab panels */
+    .dash-panel {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .dash-panel.active {
+      display: block;
+    }
+
+    /* Two column layout for results */
+    .dash-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+
+    /* Single column category grid */
+    .category-grid-single {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .category-grid-single .card.category-card {
+      padding: 14px 16px;
+    }
+
+    /* Recommendations grid */
+    .rec-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    /* Study guide grid */
+    .study-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .study-card {
+      padding: 24px;
+    }
+
+    .study-card .study-cat-name {
+      font-family: var(--font-heading);
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .study-card .study-topics {
+      list-style: none;
+      padding: 0;
       margin-bottom: 16px;
     }
 
-    .results-level-badge {
-      font-family: var(--font-heading);
-      font-size: 22px;
+    .study-card .study-topics li {
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding: 5px 0;
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .study-card .study-topics li::before {
+      content: '›';
+      position: absolute;
+      left: 0;
+      color: var(--accent-teal);
+      font-weight: 700;
+    }
+
+    .study-card .study-links {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .study-card .study-link {
+      font-size: 12px;
+      color: var(--accent-teal);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: opacity 0.2s;
+      font-family: var(--font-mono);
+    }
+
+    .study-card .study-link:hover {
+      opacity: 0.7;
+    }
+
+    /* Public leaderboard styles (reuse .leaderboard-table) */
+    .leaderboard-public-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 16px;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    .leaderboard-public-wrap .leaderboard-table th {
+      padding: 14px 16px;
+    }
+
+    .leaderboard-public-wrap .leaderboard-table td {
+      padding: 14px 16px;
+    }
+
+    /* Rank highlight for top 3 */
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      font-family: var(--font-mono);
+      font-size: 13px;
       font-weight: 600;
-      padding: 8px 24px;
-      border-radius: 12px;
-      display: inline-block;
+    }
+
+    .rank-1 { background: rgba(0, 212, 180, 0.2); color: var(--accent-teal); }
+    .rank-2 { background: rgba(59, 130, 246, 0.2); color: var(--accent-blue); }
+    .rank-3 { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); }
+    .rank-other { color: var(--text-muted); }
+
+    /* Current user highlight in leaderboard */
+    .leaderboard-table tr.current-user td {
+      background: rgba(0, 212, 180, 0.05);
+    }
+
+    @media (max-width: 768px) {
+      .dash-hero {
+        flex-direction: column;
+        text-align: center;
+        gap: 16px;
+      }
+      .dash-hero-left {
+        padding-right: 0;
+        border-right: none;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border-card);
+      }
+      .dash-two-col {
+        grid-template-columns: 1fr;
+      }
+      .study-grid, .rec-grid {
+        grid-template-columns: 1fr;
+      }
+      .dash-tabs {
+        flex-wrap: wrap;
+      }
+      .dash-score {
+        font-size: 44px;
+      }
     }
 
     .results-section {
@@ -952,20 +1182,7 @@
       margin-top: 32px;
     }
 
-    /* =====================================================
-       6: RETURNING USER SCREEN
-       ===================================================== */
-    .returning-screen .container {
-      max-width: 600px;
-      text-align: center;
-    }
-
-    .returning-screen .returning-msg {
-      font-size: 16px;
-      color: var(--text-secondary);
-      margin: 16px 0 24px;
-      line-height: 1.6;
-    }
+    /* (Returning screen removed — merged into Dashboard) */
 
     /* =====================================================
        7: ADMIN PANEL
@@ -1499,78 +1716,99 @@
   </div>
 
   <!-- =====================================================
-       SCREEN: RESULTS
+       SCREEN: DASHBOARD (replaces Results + Returning)
        ===================================================== -->
-  <div id="screenResults" class="screen results-screen">
-    <div class="container">
-      <div class="results-header">
-        <div class="results-score" id="resScore">18/25</div>
-        <div class="results-pct" id="resPct">72%</div>
-        <div class="results-level-badge" id="resLevel">HIG Practitioner</div>
-      </div>
-
-      <div class="results-section">
-        <h3>📊 Performance by Category</h3>
-        <div class="radar-chart-wrap">
-          <canvas id="radarChart"></canvas>
+  <div id="screenDashboard" class="screen dashboard-screen">
+    <div class="container-wide">
+      <!-- Dashboard Header: Score summary -->
+      <div class="dash-hero">
+        <div class="dash-hero-left">
+          <div class="dash-score" id="dashScore">18/25</div>
+          <div class="dash-pct" id="dashPct">72%</div>
+        </div>
+        <div class="dash-hero-right">
+          <div class="dash-level-badge" id="dashLevel">HIG Practitioner</div>
+          <div class="dash-user-name" id="dashUserName"></div>
+          <div class="dash-meta" id="dashMeta"></div>
         </div>
       </div>
 
-      <div class="results-section">
-        <h3>📋 Category Breakdown</h3>
-        <div class="category-grid" id="categoryGrid"></div>
+      <!-- Tab navigation -->
+      <div class="dash-tabs">
+        <button class="dash-tab active" data-tab="myresults" onclick="switchDashTab('myresults')">📊 My Results</button>
+        <button class="dash-tab" data-tab="leaderboard" onclick="switchDashTab('leaderboard')">🏆 Leaderboard</button>
+        <button class="dash-tab" data-tab="study" onclick="switchDashTab('study')">📚 Study Guide</button>
       </div>
 
-      <div class="results-section">
-        <h3>⏱️ Time Statistics</h3>
-        <div class="time-stats-grid" id="timeStats"></div>
-      </div>
+      <!-- TAB: My Results -->
+      <div class="dash-panel active" id="panelMyresults">
+        <div class="dash-two-col">
+          <div>
+            <div class="results-section">
+              <h3>Performance by Category</h3>
+              <div class="radar-chart-wrap">
+                <canvas id="dashRadarChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="results-section">
+              <h3>Category Breakdown</h3>
+              <div id="dashCategoryGrid" class="category-grid-single"></div>
+            </div>
+            <div class="results-section">
+              <h3>Time Statistics</h3>
+              <div class="time-stats-grid" id="dashTimeStats"></div>
+            </div>
+          </div>
+        </div>
 
-      <div class="results-section">
-        <h3>📚 Recommendations</h3>
-        <div id="recommendations"></div>
-      </div>
+        <div class="results-section">
+          <h3>📚 Recommendations</h3>
+          <div id="dashRecommendations" class="rec-grid"></div>
+        </div>
 
-      <div id="tabSwitchWarning" class="tab-switch-warning hidden"></div>
+        <div id="dashTabSwitchWarning" class="tab-switch-warning hidden"></div>
 
-      <div class="results-actions">
-        <button class="btn btn-primary" onclick="shareResults()">📋 Copy Results</button>
-        <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- =====================================================
-       SCREEN: RETURNING USER
-       ===================================================== -->
-  <div id="screenReturning" class="screen returning-screen">
-    <div class="container">
-      <div class="results-header">
-        <div class="results-score" id="retScore">18/25</div>
-        <div class="results-pct" id="retPct">72%</div>
-        <div class="results-level-badge" id="retLevel">HIG Practitioner</div>
-      </div>
-      <p class="returning-msg">
-        You've already completed this quiz. Your results are shown above.<br>
-        Contact the admin for a retry.
-      </p>
-
-      <div class="results-section">
-        <h3>📊 Performance by Category</h3>
-        <div class="radar-chart-wrap">
-          <canvas id="retRadarChart"></canvas>
+        <div class="results-actions">
+          <button class="btn btn-primary" onclick="shareResults()">📋 Copy Results</button>
         </div>
       </div>
 
-      <div class="results-section">
-        <h3>📋 Category Breakdown</h3>
-        <div class="category-grid" id="retCategoryGrid"></div>
+      <!-- TAB: Leaderboard -->
+      <div class="dash-panel" id="panelLeaderboard">
+        <div class="leaderboard-public-wrap">
+          <div class="leaderboard-table-wrap">
+            <table class="leaderboard-table">
+              <thead>
+                <tr>
+                  <th onclick="sortPublicLeaderboard('rank')"># <span class="sort-arrow">↕</span></th>
+                  <th onclick="sortPublicLeaderboard('name')">Name <span class="sort-arrow">↕</span></th>
+                  <th onclick="sortPublicLeaderboard('score')">Score <span class="sort-arrow">↕</span></th>
+                  <th onclick="sortPublicLeaderboard('level')">Level <span class="sort-arrow">↕</span></th>
+                  <th onclick="sortPublicLeaderboard('date')">Date <span class="sort-arrow">↕</span></th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody id="publicLeaderboardBody"></tbody>
+            </table>
+          </div>
+          <p id="leaderboardEmpty" class="hidden" style="text-align:center;color:var(--text-muted);padding:40px 0;font-size:14px;">
+            No results yet. Be the first to complete the quiz!
+          </p>
+        </div>
       </div>
 
-      <div class="results-actions">
-        <button class="btn btn-primary" onclick="shareResults()">📋 Copy Results</button>
-        <button class="btn btn-secondary" onclick="signOut()">Sign Out</button>
+      <!-- TAB: Study Guide -->
+      <div class="dash-panel" id="panelStudy">
+        <p style="color:var(--text-secondary);margin-bottom:24px;font-size:15px;line-height:1.6;">
+          Deep-dive into each Apple HIG category. These are the official resources from Apple — bookmark the ones relevant to your weak areas.
+        </p>
+        <div class="study-grid" id="studyGrid">
+          <!-- Populated by JS -->
+        </div>
       </div>
+
     </div>
   </div>
 
@@ -1583,7 +1821,7 @@
         <h2 class="admin-title" style="margin-bottom:0;">⚙️ Admin Panel</h2>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary btn-sm" onclick="exportCSV()">📥 Export CSV</button>
-          <button class="btn btn-secondary btn-sm" onclick="showScreen('prequiz')">← Back to Quiz</button>
+          <button class="btn btn-secondary btn-sm" onclick="goHome()">← Back</button>
         </div>
       </div>
 
@@ -2379,10 +2617,10 @@
         showScreen('auth');
         return;
       }
-      // If user has completed quiz, show returning screen
+      // If user has completed quiz, show dashboard
       db.collection('results').doc(currentUser.email).get().then(doc => {
         if (doc.exists) {
-          showReturningUser(doc.data());
+          renderDashboard(doc.data());
         } else {
           showScreen('prequiz');
         }
@@ -2413,41 +2651,14 @@
         'auth': 'Auth',
         'prequiz': 'PreQuiz',
         'quiz': 'Quiz',
-        'results': 'Results',
-        'returning': 'Returning',
+        'dashboard': 'Dashboard',
         'admin': 'Admin'
       };
       return map[s] || s;
     }
 
     function showReturningUser(data) {
-      document.getElementById('retScore').textContent = `${data.score}/${data.totalQuestions}`;
-      document.getElementById('retPct').textContent = `${data.percentage}%`;
-
-      const levelEl = document.getElementById('retLevel');
-      levelEl.textContent = data.level;
-      levelEl.style.background = getLevelBg(data.level);
-      levelEl.style.color = getLevelColor(data.level);
-
-      // Category grid
-      const catGrid = document.getElementById('retCategoryGrid');
-      catGrid.innerHTML = '';
-      Object.entries(data.categories).forEach(([key, cat]) => {
-        const status = cat.percentage >= 80 ? 'teal' : cat.percentage >= 50 ? 'amber' : 'red';
-        catGrid.innerHTML += `
-          <div class="card category-card">
-            <div class="cat-left">
-              <div class="cat-status" style="background:var(--accent-${status})"></div>
-              <span class="cat-name">${CATEGORY_NAMES[key] || key}</span>
-            </div>
-            <span class="cat-score">${cat.correct}/${cat.total}</span>
-          </div>`;
-      });
-
-      // Radar chart
-      renderRadarChart('retRadarChart', data.categories);
-
-      showScreen('returning');
+      renderDashboard(data);
     }
 
     function showLoading() {
@@ -2888,87 +3099,111 @@
       return recs;
     }
 
-    function renderResults(data) {
-      document.getElementById('resScore').textContent = `${data.score}/${data.totalQuestions}`;
-      document.getElementById('resPct').textContent = `${data.percentage}%`;
+    function renderDashboard(data) {
+      // Hero section
+      document.getElementById('dashScore').textContent = `${data.score}/${data.totalQuestions}`;
+      document.getElementById('dashPct').textContent = `${data.percentage}%`;
+      document.getElementById('dashUserName').textContent = data.name || '';
+      document.getElementById('dashMeta').textContent = data.completedAt?.toDate
+        ? `Completed ${data.completedAt.toDate().toLocaleDateString()} · ${formatTime(data.duration || 0)} total`
+        : `Duration: ${formatTime(data.duration || 0)}`;
 
-      const levelEl = document.getElementById('resLevel');
+      const levelEl = document.getElementById('dashLevel');
       levelEl.textContent = data.level;
       levelEl.style.background = getLevelBg(data.level);
       levelEl.style.color = getLevelColor(data.level);
 
       // Category grid
-      const catGrid = document.getElementById('categoryGrid');
+      const catGrid = document.getElementById('dashCategoryGrid');
       catGrid.innerHTML = '';
       Object.entries(data.categories).forEach(([key, cat]) => {
         const status = cat.percentage >= 80 ? 'teal' : cat.percentage >= 50 ? 'amber' : 'red';
+        const pctBar = `<div style="flex:1;height:4px;background:rgba(30,45,69,0.8);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${cat.percentage}%;background:var(--accent-${status});border-radius:2px;"></div>
+        </div>`;
         catGrid.innerHTML += `
           <div class="card category-card">
-            <div class="cat-left">
+            <div class="cat-left" style="flex:1;">
               <div class="cat-status" style="background:var(--accent-${status})"></div>
               <span class="cat-name">${CATEGORY_NAMES[key] || key}</span>
             </div>
-            <span class="cat-score">${cat.correct}/${cat.total}</span>
+            <span class="cat-score" style="margin-left:auto;">${cat.correct}/${cat.total}</span>
           </div>`;
       });
 
       // Time stats
-      const times = data.answers.map(a => a.timeSpent);
-      const avgTime = Math.round(times.reduce((s, t) => s + t, 0) / times.length);
-      const fastest = Math.min(...times);
-      const slowest = Math.max(...times);
-      document.getElementById('timeStats').innerHTML = `
-        <div class="card time-stat-card">
-          <div class="stat-value">${avgTime}s</div>
-          <div class="stat-label">Avg per question</div>
-        </div>
-        <div class="card time-stat-card">
-          <div class="stat-value">${fastest}s</div>
-          <div class="stat-label">Fastest</div>
-        </div>
-        <div class="card time-stat-card">
-          <div class="stat-value">${formatTime(data.duration)}</div>
-          <div class="stat-label">Total time</div>
-        </div>`;
+      if (data.answers && data.answers.length > 0) {
+        const times = data.answers.map(a => a.timeSpent);
+        const avgTime = Math.round(times.reduce((s, t) => s + t, 0) / times.length);
+        const fastest = Math.min(...times);
+        document.getElementById('dashTimeStats').innerHTML = `
+          <div class="card time-stat-card">
+            <div class="stat-value">${avgTime}s</div>
+            <div class="stat-label">Avg / question</div>
+          </div>
+          <div class="card time-stat-card">
+            <div class="stat-value">${fastest}s</div>
+            <div class="stat-label">Fastest</div>
+          </div>
+          <div class="card time-stat-card">
+            <div class="stat-value">${formatTime(data.duration || 0)}</div>
+            <div class="stat-label">Total</div>
+          </div>`;
+      } else {
+        document.getElementById('dashTimeStats').innerHTML = `
+          <div class="card time-stat-card">
+            <div class="stat-value">${formatTime(data.duration || 0)}</div>
+            <div class="stat-label">Total time</div>
+          </div>`;
+      }
 
       // Recommendations
-      const recsEl = document.getElementById('recommendations');
+      const recs = data.recommendations || generateRecommendations(data.categories);
+      const recsEl = document.getElementById('dashRecommendations');
       recsEl.innerHTML = '';
-      data.recommendations
-        .sort((a, b) => {
-          const order = { weak: 0, moderate: 1, strong: 2 };
-          return order[a.status] - order[b.status];
-        })
-        .forEach(rec => {
-          const statusColor = rec.status === 'strong' ? 'teal' : rec.status === 'moderate' ? 'amber' : 'red';
-          const statusLabel = rec.status === 'strong' ? '✅ Strength' : rec.status === 'moderate' ? '⚠️ Good but review' : '❌ Focus area';
-
-          recsEl.innerHTML += `
-            <div class="card rec-card">
-              <div class="rec-header">
-                <span class="rec-title">${rec.category}</span>
-                <span class="badge badge-${statusColor}">${statusLabel}</span>
-              </div>
-              ${rec.status !== 'strong' ? `
-                <ul class="rec-tips">
-                  ${rec.tips.map(t => `<li>${t}</li>`).join('')}
-                </ul>
-                ${rec.links.map(l => `<a href="${l}" target="_blank" rel="noopener" class="rec-link">Study this HIG section →</a>`).join('')}
-              ` : '<p style="font-size:13px;color:var(--text-muted);">Great job — keep it up!</p>'}
-            </div>`;
-        });
+      recs.sort((a, b) => {
+        const order = { weak: 0, moderate: 1, strong: 2 };
+        return order[a.status] - order[b.status];
+      }).forEach(rec => {
+        const statusColor = rec.status === 'strong' ? 'teal' : rec.status === 'moderate' ? 'amber' : 'red';
+        const statusLabel = rec.status === 'strong' ? '✅ Strength' : rec.status === 'moderate' ? '⚠️ Review' : '❌ Focus area';
+        recsEl.innerHTML += `
+          <div class="card rec-card">
+            <div class="rec-header">
+              <span class="rec-title">${rec.category}</span>
+              <span class="badge badge-${statusColor}">${statusLabel}</span>
+            </div>
+            ${rec.status !== 'strong' ? `
+              <ul class="rec-tips">
+                ${rec.tips.map(t => `<li>${t}</li>`).join('')}
+              </ul>
+              ${rec.links.map(l => `<a href="${l}" target="_blank" rel="noopener" class="rec-link">Study this HIG section →</a>`).join('')}
+            ` : '<p style="font-size:13px;color:var(--text-muted);margin-top:4px;">Great job — keep it up!</p>'}
+          </div>`;
+      });
 
       // Tab switch warning
       if (data.tabSwitches > 3) {
-        const warn = document.getElementById('tabSwitchWarning');
+        const warn = document.getElementById('dashTabSwitchWarning');
         warn.textContent = `⚠️ ${data.tabSwitches} tab switches were detected during the quiz`;
         warn.classList.remove('hidden');
       }
 
       // Radar chart
-      renderRadarChart('radarChart', data.categories);
+      renderRadarChart('dashRadarChart', data.categories);
 
-      showScreen('results');
+      // Render study guide
+      renderStudyGuide();
+
+      // Load public leaderboard
+      loadPublicLeaderboard();
+
+      showScreen('dashboard');
+    }
+
+    // Alias for backward compatibility
+    function renderResults(data) {
+      renderDashboard(data);
     }
 
     function renderRadarChart(canvasId, categories) {
@@ -3034,17 +3269,267 @@
       return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
-    function shareResults() {
-      const score = document.getElementById('resScore')?.textContent || document.getElementById('retScore')?.textContent;
-      const pct = document.getElementById('resPct')?.textContent || document.getElementById('retPct')?.textContent;
-      const level = document.getElementById('resLevel')?.textContent || document.getElementById('retLevel')?.textContent;
+    // =====================================================
+    // DASHBOARD: Tab switching
+    // =====================================================
 
-      const text = `📋 Apple HIG Mastery Check Results\n\nScore: ${score} (${pct})\nLevel: ${level}\n\nTake the quiz: [your-github-pages-url]`;
+    function switchDashTab(tabName) {
+      document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.dash-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.dash-tab[data-tab="${tabName}"]`).classList.add('active');
+      document.getElementById(`panel${tabName.charAt(0).toUpperCase() + tabName.slice(1)}`).classList.add('active');
+    }
+
+    // =====================================================
+    // PUBLIC LEADERBOARD
+    // =====================================================
+
+    let publicResults = [];
+    let publicSortField = 'score';
+    let publicSortDir = 'desc';
+
+    async function loadPublicLeaderboard() {
+      try {
+        const snap = await db.collection('results').get();
+        publicResults = [];
+        snap.forEach(doc => publicResults.push(doc.data()));
+        renderPublicLeaderboard();
+      } catch (err) {
+        console.error('Leaderboard load error:', err);
+        document.getElementById('leaderboardEmpty').classList.remove('hidden');
+      }
+    }
+
+    function renderPublicLeaderboard() {
+      if (publicResults.length === 0) {
+        document.getElementById('leaderboardEmpty').classList.remove('hidden');
+        return;
+      }
+      document.getElementById('leaderboardEmpty').classList.add('hidden');
+
+      let sorted = [...publicResults];
+      sorted.sort((a, b) => {
+        let va, vb;
+        switch (publicSortField) {
+          case 'name': va = a.name || ''; vb = b.name || ''; break;
+          case 'score': va = a.percentage; vb = b.percentage; break;
+          case 'level':
+            const lo = { 'HIG Master': 5, 'HIG Proficient': 4, 'HIG Practitioner': 3, 'HIG Explorer': 2, 'HIG Novice': 1 };
+            va = lo[a.level] || 0; vb = lo[b.level] || 0; break;
+          case 'date':
+            va = a.completedAt?.seconds || 0; vb = b.completedAt?.seconds || 0; break;
+          default: va = a.percentage; vb = b.percentage;
+        }
+        if (typeof va === 'string') return publicSortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+        return publicSortDir === 'asc' ? va - vb : vb - va;
+      });
+
+      const tbody = document.getElementById('publicLeaderboardBody');
+      tbody.innerHTML = sorted.map((r, i) => {
+        const date = r.completedAt?.toDate ? r.completedAt.toDate().toLocaleDateString() : '—';
+        const isMe = currentUser && r.email === currentUser.email;
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+        const badgeColor = r.level === 'HIG Master' ? 'teal' : r.level === 'HIG Proficient' ? 'blue' : r.level === 'HIG Practitioner' ? 'amber' : r.level === 'HIG Explorer' ? 'orange' : 'red';
+
+        return `
+          <tr class="${isMe ? 'current-user' : ''}">
+            <td><span class="rank-badge ${rankClass}">${i + 1}</span></td>
+            <td>
+              <div class="user-cell">
+                <img src="${r.photoURL || ''}" alt="" onerror="this.style.display='none'" style="width:28px;height:28px;border-radius:50%;">
+                <div>
+                  <div class="user-name">${r.name || '—'}${isMe ? ' <span style="font-size:11px;color:var(--accent-teal);">(you)</span>' : ''}</div>
+                </div>
+              </div>
+            </td>
+            <td class="score-cell">${r.score}/${r.totalQuestions} (${r.percentage}%)</td>
+            <td><span class="badge badge-${badgeColor}">${r.level}</span></td>
+            <td style="font-size:13px;color:var(--text-secondary);">${date}</td>
+            <td style="font-family:var(--font-mono);font-size:13px;">${formatTime(r.duration || 0)}</td>
+          </tr>`;
+      }).join('');
+    }
+
+    function sortPublicLeaderboard(field) {
+      if (publicSortField === field) {
+        publicSortDir = publicSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        publicSortField = field;
+        publicSortDir = field === 'name' ? 'asc' : 'desc';
+      }
+      renderPublicLeaderboard();
+    }
+
+    // =====================================================
+    // STUDY GUIDE
+    // =====================================================
+
+    function renderStudyGuide() {
+      const studyData = [
+        {
+          icon: '🔤',
+          name: 'Typography & Color',
+          topics: [
+            'San Francisco font family (SF Pro Text & Display)',
+            'Dynamic Type — user-controlled text scaling',
+            'Font weight recommendations for hierarchy',
+            'Semantic/system colors (label, secondaryLabel)',
+            'Dark mode color adaptation',
+            'Custom colors and accessibility'
+          ],
+          links: [
+            { label: 'Typography', url: 'https://developer.apple.com/design/human-interface-guidelines/typography' },
+            { label: 'Color', url: 'https://developer.apple.com/design/human-interface-guidelines/color' }
+          ]
+        },
+        {
+          icon: '📐',
+          name: 'Layout & Spacing',
+          topics: [
+            'Safe areas and system UI insets',
+            'Standard 16pt margins',
+            'Auto Layout and adaptive interfaces',
+            'Readable content width for text',
+            'Grid alignment and consistent spacing',
+            'Supporting multiple orientations'
+          ],
+          links: [
+            { label: 'Layout', url: 'https://developer.apple.com/design/human-interface-guidelines/layout' }
+          ]
+        },
+        {
+          icon: '🎨',
+          name: 'Icons & Images',
+          topics: [
+            'SF Symbols library (6,000+ icons)',
+            '4 rendering modes: Monochrome, Hierarchical, Palette, Multicolor',
+            'Weight matching with adjacent text',
+            'App icon specs (no transparency, system mask)',
+            'Image resolution scales (@1x, @2x, @3x)',
+            'Custom symbol creation'
+          ],
+          links: [
+            { label: 'SF Symbols', url: 'https://developer.apple.com/design/human-interface-guidelines/sf-symbols' },
+            { label: 'App Icons', url: 'https://developer.apple.com/design/human-interface-guidelines/app-icons' },
+            { label: 'Images', url: 'https://developer.apple.com/design/human-interface-guidelines/images' }
+          ]
+        },
+        {
+          icon: '🧭',
+          name: 'Navigation & Structure',
+          topics: [
+            'Tab bars (3-5 tabs on iPhone)',
+            'Navigation bars and hierarchical drill-down',
+            'Sidebars (iPad alternative to tab bars)',
+            'Modal vs push navigation decisions',
+            'Tab bar visibility rules',
+            'The "More" tab pattern'
+          ],
+          links: [
+            { label: 'Tab Bars', url: 'https://developer.apple.com/design/human-interface-guidelines/tab-bars' },
+            { label: 'Navigation', url: 'https://developer.apple.com/design/human-interface-guidelines/navigation' },
+            { label: 'Modality', url: 'https://developer.apple.com/design/human-interface-guidelines/modality' },
+            { label: 'Sidebars', url: 'https://developer.apple.com/design/human-interface-guidelines/sidebars' }
+          ]
+        },
+        {
+          icon: '🎛️',
+          name: 'Controls',
+          topics: [
+            'Button styles: Filled, Tinted, Plain',
+            'Toggle (Switch) for binary on/off',
+            'Segmented controls for mutually exclusive options',
+            'Pickers for large value sets (date, time)',
+            'Sliders for continuous ranges',
+            'Text fields and search bars'
+          ],
+          links: [
+            { label: 'Buttons', url: 'https://developer.apple.com/design/human-interface-guidelines/buttons' },
+            { label: 'Toggles', url: 'https://developer.apple.com/design/human-interface-guidelines/toggles' },
+            { label: 'Segmented Controls', url: 'https://developer.apple.com/design/human-interface-guidelines/segmented-controls' },
+            { label: 'Pickers', url: 'https://developer.apple.com/design/human-interface-guidelines/pickers' }
+          ]
+        },
+        {
+          icon: '🔔',
+          name: 'Feedback & Status',
+          topics: [
+            'Alerts: when to use, 2-button max recommended',
+            'Action sheets vs alerts decision',
+            'Progress indicators (determinate vs indeterminate)',
+            'Activity indicators for unknown duration',
+            'Haptic feedback types (Success, Warning, Error)',
+            'Destructive action patterns'
+          ],
+          links: [
+            { label: 'Alerts', url: 'https://developer.apple.com/design/human-interface-guidelines/alerts' },
+            { label: 'Action Sheets', url: 'https://developer.apple.com/design/human-interface-guidelines/action-sheets' },
+            { label: 'Progress Indicators', url: 'https://developer.apple.com/design/human-interface-guidelines/progress-indicators' },
+            { label: 'Playing Haptics', url: 'https://developer.apple.com/design/human-interface-guidelines/playing-haptics' }
+          ]
+        },
+        {
+          icon: '👆',
+          name: 'User Input & Interaction',
+          topics: [
+            'Standard iOS gestures (tap, swipe, pinch, long press)',
+            'Edge swipe for back navigation',
+            'Undo/Redo support (shake, 3-finger swipe)',
+            'Permission request timing (at point of use)',
+            'Onboarding best practices (brief, skippable)',
+            'Drag and drop patterns'
+          ],
+          links: [
+            { label: 'Gestures', url: 'https://developer.apple.com/design/human-interface-guidelines/gestures' },
+            { label: 'Undo and Redo', url: 'https://developer.apple.com/design/human-interface-guidelines/undo-and-redo' },
+            { label: 'Privacy', url: 'https://developer.apple.com/design/human-interface-guidelines/privacy' },
+            { label: 'Onboarding', url: 'https://developer.apple.com/design/human-interface-guidelines/onboarding' }
+          ]
+        },
+        {
+          icon: '♿',
+          name: 'Accessibility & Inclusivity',
+          topics: [
+            'Minimum 44×44 pt touch targets',
+            'VoiceOver: accessibility labels and hints',
+            'Dynamic Type support for all text',
+            'Never rely on color alone for information',
+            'Sufficient color contrast ratios',
+            'Reduce Motion support (replace with cross-dissolves)',
+            'Switch Control compatibility'
+          ],
+          links: [
+            { label: 'Accessibility', url: 'https://developer.apple.com/design/human-interface-guidelines/accessibility' }
+          ]
+        }
+      ];
+
+      const grid = document.getElementById('studyGrid');
+      grid.innerHTML = studyData.map(cat => `
+        <div class="card study-card">
+          <div class="study-cat-name">${cat.icon} ${cat.name}</div>
+          <ul class="study-topics">
+            ${cat.topics.map(t => `<li>${t}</li>`).join('')}
+          </ul>
+          <div class="study-links">
+            ${cat.links.map(l => `<a href="${l.url}" target="_blank" rel="noopener" class="study-link">📖 ${l.label} →</a>`).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // =====================================================
+
+    function shareResults() {
+      const score = document.getElementById('dashScore')?.textContent || '';
+      const pct = document.getElementById('dashPct')?.textContent || '';
+      const level = document.getElementById('dashLevel')?.textContent || '';
+
+      const text = `📋 Apple HIG Mastery Check Results\n\nScore: ${score} (${pct})\nLevel: ${level}\n\nTake the quiz: https://mikeperish.github.io/apple-design-quiz/`;
 
       navigator.clipboard.writeText(text).then(() => {
         alert('Results copied to clipboard!');
       }).catch(() => {
-        // Fallback
         prompt('Copy your results:', text);
       });
     }
